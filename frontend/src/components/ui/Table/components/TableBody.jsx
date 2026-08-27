@@ -1,0 +1,5 @@
+function TableBody({ children }) {
+  return <tbody className="divide-y divide-gray-100">{children}</tbody>;
+}
+
+export default TableBody;
