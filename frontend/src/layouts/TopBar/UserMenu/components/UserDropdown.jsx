@@ -3,10 +3,7 @@ import UserMenuItem from "./UserMenuItem";
 import useTheme from "../../../Theme/useTheme";
 import {
   ChevronLeft,
-  UserRound,
   Mail,
-  Settings,
-  Bookmark,
   X,
   Moon,
   Sun,
@@ -19,7 +16,7 @@ function UserDropdown({ userMenuData, user }) {
 
   return (
     <div
-      className="mt-1.5 w-80 bg-white/95 dark:bg-slate-900/95 
+      className="mt-1.5 w-80 bg-Surface/95 dark:bg-slate-900/95 
            backdrop-blur-xl
            rounded-2xl shadow-2xl 
            border border-white/20 dark:border-slate-700/50
@@ -47,7 +44,7 @@ function UserDropdown({ userMenuData, user }) {
               <div className="w-3 h-3 text-amber-500">
                 <Mail size={12} />
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-textMuted dark:text-textMuted">
                 {user.email}
               </span>
             </div>
@@ -55,26 +52,26 @@ function UserDropdown({ userMenuData, user }) {
         </div>
 
         {/* <!-- آمار مدیریتی (مناسب ادمین) --> */}
-        <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-slate-700/50">
+        <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-Border dark:border-slate-700/50">
           <div className="text-center">
-            <p className="text-lg font-bold text-gray-800 dark:text-white">
+            <p className="text-lg font-bold text-textPrimary">
               ۱,۲۴۷
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-textMuted dark:text-textMuted">
               کل کاربران
             </p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-bold text-gray-800 dark:text-white">۳</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-lg font-bold text-textPrimary">۳</p>
+            <p className="text-xs text-textMuted dark:text-textMuted">
               کل تیکت ها
             </p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-bold text-gray-800 dark:text-white">
+            <p className="text-lg font-bold text-textPrimary">
               ۱۲
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-textMuted dark:text-textMuted">
               محصولات جدید
             </p>
           </div>
@@ -94,11 +91,11 @@ function UserDropdown({ userMenuData, user }) {
           (item) =>
             item.type === "action" && (
               <div
-                className="flex justify-between items-center p-4 p  text-gray-700"
+                className="flex justify-between items-center p-4 p  text-textSecondary"
                 key={item.id}
               >
                 <div className="flex ">
-                  <span className=" font-medium  text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                  <span className=" font-medium  text-textSecondary dark:text-textMuted hover:bg-amber-50 dark:hover:bg-amber-900/20">
                     {item.title}
                   </span>
                 </div>
@@ -122,7 +119,7 @@ function UserDropdown({ userMenuData, user }) {
                   >
                     {/* Thumb */}
                     <div
-                      className={` absolute top-1 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md transition-all duration-500
+                      className={` absolute top-1 flex h-8 w-8 items-center justify-center rounded-full bg-Surface shadow-md transition-all duration-500
         ${isDark ? "left-11" : "left-1"}
       `}
                     >
@@ -140,16 +137,16 @@ function UserDropdown({ userMenuData, user }) {
       </div>
 
       {/* <!-- اطلاعات سیستم و نسخه --> */}
-      <div className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50 border-y border-gray-100 dark:border-slate-700/50">
+      <div className="px-4 py-2 bg-SurfaceMuted dark:bg-slate-800/50 border-y border-Border dark:border-slate-700/50">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-500 dark:text-gray-400">نسخه سیستم</span>
+          <span className="text-textMuted dark:text-textMuted">نسخه سیستم</span>
           <span className="font-mono text-amber-600 dark:text-amber-400">
             v2.5.0
           </span>
         </div>
         <div className="flex items-center justify-between text-xs mt-1">
-          <span className="text-gray-500 dark:text-gray-400">آخرین ورود</span>
-          <span className="text-gray-700 dark:text-gray-300">
+          <span className="text-textMuted dark:text-textMuted">آخرین ورود</span>
+          <span className="text-textSecondary dark:text-textMuted">
             ۱۴۰۴/۰۲/۱۰ - ۱۴:۳۰
           </span>
         </div>

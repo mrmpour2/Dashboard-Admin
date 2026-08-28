@@ -1,4 +1,4 @@
-import { Accordion, Tabs, Button } from "../components/ui";
+import { Tabs, Button } from "../components/ui";
 import useToast from "../components/ui/Toast/ToastContext/useToast";
 
 function TestTabs() {

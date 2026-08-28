@@ -1,9 +1,11 @@
+import NotificationItem from "./NotificationItem";
+
 function NotificationDropdown({ notifications, count }) {
   return (
     <>
       <div
         className=" mt-3 w-96 
-           bg-white/95 dark:bg-slate-900/95 
+           bg-Surface/95 dark:bg-slate-900/95 
            backdrop-blur-xl
            rounded-2xl shadow-2xl 
            border border-white/20 dark:border-slate-700/50
@@ -12,8 +14,8 @@ function NotificationDropdown({ notifications, count }) {
         "
       >
         {/* <!-- Header --> */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2 dark:text-gray-300">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-Border">
+          <div className="flex items-center gap-2 dark:text-textMuted">
             <span className="size-2 rounded-full bg-amber-500 animate-pulse " />
 
             <h3 className="font-bold text-base">اعلانات</h3>
@@ -25,7 +27,7 @@ function NotificationDropdown({ notifications, count }) {
 
           <button
             type="button"
-            className="text-xs text-gray-500 hover:text-red-500 transition"
+            className="text-xs text-textMuted hover:text-red-500 transition"
           >
             حذف همه
           </button>

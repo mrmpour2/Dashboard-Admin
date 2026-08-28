@@ -17,7 +17,8 @@ function Input({
   id,
   ...props
 }) {
-  const inputID = id || useId();
+  const generatedId = useId();
+  const inputID = id || generatedId;
   return (
     <div className={` flex flex-col gap-2 font-Vazir ${className}`}>
       <div className=" h-12 relative flex justify-between  rounded-Input">
@@ -30,16 +31,16 @@ function Input({
           className={clsx(
             error
               ? "w-full border-b border-red-600 py-1 focus:border-b-2 focus:border-red-600 transition-colors focus:outline-none peer bg-inherit"
-              : "w-full border-b border-gray-300 py-1  focus:border-b-2 focus:border-primary transition-colors focus:outline-none peer bg-inherit",
+              : "w-full border-b border-Border py-1  focus:border-b-2 focus:border-primary transition-colors focus:outline-none peer bg-inherit",
             {
-              "w-full border-b border-gray-700 text-gray-300 py-1": disabled,
+              "w-full border-b border-Border text-textMuted py-1": disabled,
             },
             className,
           )}
           {...props}
         />
         {icon && (
-          <div className="absolute left-3 top-1/2 items-end  -translate-y-1/2 text-gray-400 pointer-events-non">
+          <div className="absolute left-3 top-1/2 items-end  -translate-y-1/2 text-textMuted pointer-events-non">
             {icon}
           </div>
         )}

@@ -85,6 +85,10 @@ function ComboboxProvider({
   const getItems = useCallback(() => Array.from(itemsRef.current.values()), []);
 
   const visibleItems = useMemo(
+    // itemsRef is an intentional imperative registry (like a DOM ref);
+    // itemsVersion is bumped on every register/unregister specifically
+    // to make this memo re-evaluate, so reading itemsRef.current here is safe.
+    // eslint-disable-next-line react-hooks/refs
     () => getItems().filter((item) => matchesSearchValue(item.label, searchValue)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [getItems, searchValue, itemsVersion],
@@ -97,10 +101,15 @@ function ComboboxProvider({
 
   // A stale highlight from a previous search or session should
   // never persist: reset it whenever the query changes or the list
-  // closes.
+  // closes. This synchronizes internal UI state with props/derived
+  // state (not an external system), which is an accepted use of effects.
+  /* eslint-disable react-hooks/set-state-in-effect -- synchronizes internal
+     UI state (highlight) with derived state (search/open), not an external
+     system; equivalent to key-based reset but scoped to this field only. */
   useEffect(() => {
     setHighlightedIndex(-1);
   }, [searchValue, open]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const moveHighlight = useCallback(
     (direction) => {

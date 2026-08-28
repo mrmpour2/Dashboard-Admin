@@ -13,7 +13,7 @@ function ModalContent({ children, className = "", ...props }) {
         aria-labelledby="modal-title"
         aria-describedby="modal-description"
         className={clsx(
-          "relative bg-white rounded-xl w-125 pointer-events-auto z-10",
+          "relative bg-Surface rounded-xl w-125 pointer-events-auto z-10",
           className,
         )}
         {...props}

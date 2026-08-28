@@ -1,4 +1,3 @@
-import clsx from "clsx";
 import DropdownProvider from "./context/DropdownProvider";
 import DropdownTrigger from "./components/DropdownTrigger";
 import DropdownContent from "./components/DropdownContent";

@@ -7,7 +7,7 @@ function PaginationInfo() {
   const end = Math.min(currentPage * pageSize, totalItems);
 
   return (
-    <span className="text-sm text-gray-500">
+    <span className="text-sm text-textMuted">
       Showing {start}-{end} of {totalItems}
     </span>
   );

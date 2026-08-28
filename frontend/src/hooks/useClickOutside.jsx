@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 
-function useClickOutside(ref, handler) {
+function useClickOutside(ref, handler, enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
     const listener = (event) => {
       if (!ref.current) return;
       if (!ref.current.contains(event.target)) {
@@ -14,7 +15,7 @@ function useClickOutside(ref, handler) {
     return () => {
       document.removeEventListener("mousedown", listener);
     };
-  }, [ref, handler]);
+  }, [ref, handler, enabled]);
 }
 
 export default useClickOutside;

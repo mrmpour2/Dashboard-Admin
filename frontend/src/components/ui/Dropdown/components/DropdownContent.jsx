@@ -14,7 +14,7 @@ function DropdownContent({
   return (
     <div
       className={clsx(
-        `absolute flex flex-col mt-1  overflow-y-auto bg-white rounded-xl shadow-lg border border-gray-200  z-50`,
+        `absolute flex flex-col mt-1  overflow-y-auto bg-Surface rounded-xl shadow-lg border border-Border  z-50`,
         alignVariants[align],
         sideVariants[side],
         className,

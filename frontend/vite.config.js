@@ -1,8 +1,39 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath, URL } from "node:url";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
+  build: {
+    sourcemap: false,
+    // تفکیک وابستگی‌های حجیم به chunk جدا برای بارگذاری سریع‌تر و کش بهتر مرورگر
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("recharts")) return "charts";
+            if (id.includes("@tanstack")) return "query";
+            if (id.includes("react-router") || id.includes("/react/") || id.includes("/react-dom/"))
+              return "vendor";
+          }
+        },
+      },
+    },
+  },
+  server: {
+    // تنظیم proxy برای جلوگیری از مشکلات CORS در توسعه (بک‌اند روی پورت 4000)
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+      },
+    },
+  },
 });

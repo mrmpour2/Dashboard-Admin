@@ -3,7 +3,6 @@ import {
   Settings,
   ShieldCheck,
   Moon,
-  LogOut,
   Heart,
 } from "lucide-react";
 
@@ -40,6 +39,7 @@ const userMenuItems = [
     title: "علاقه‌مندی‌ها",
     description: "محصولات ذخیره‌شده ، تیکت های  و آیتم های مورد علاقه",
     bgColor: "bg-rose-100",
+    path: "/favorites",
     icon: Heart,
     type: "link",
   },

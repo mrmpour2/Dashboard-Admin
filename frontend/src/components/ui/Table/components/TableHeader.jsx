@@ -1,6 +1,6 @@
 function TableHeader({ children }) {
   return (
-    <thead className="bg-gray-50 border-b border-gray-200">
+    <thead className="bg-SurfaceMuted border-b border-Border">
       <tr>{children}</tr>
     </thead>
   );

@@ -9,7 +9,7 @@ function TableRow({ rowId, children }) {
     <tr
       onClick={isSelectable ? () => toggleRowSelection(rowId) : undefined}
       className={`${isSelected ? "bg-blue-50" : ""} ${
-        isSelectable ? "cursor-pointer hover:bg-gray-50" : ""
+        isSelectable ? "cursor-pointer hover:bg-SurfaceMuted" : ""
       }`}
     >
       {children}

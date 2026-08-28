@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import clsx from "clsx";
 import useDropdown from "../context/useDropdown";
 
@@ -27,10 +26,10 @@ function DropdownItem({
       className={clsx(
         "rounded p-2 cursor-pointer block font-Vazir transition-colors duration-150",
         {
-          "hover:bg-gray-100": !disabled,
+          "hover:bg-SurfaceMuted": !disabled,
           "opacity-50 cursor-not-allowed": disabled,
-          "text-gray-700": !disabled,
-          "text-gray-400": disabled,
+          "text-textSecondary": !disabled,
+          "text-textMuted": disabled,
         },
         className,
       )}

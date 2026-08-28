@@ -1,5 +1,4 @@
 import clsx from "clsx";
-import useModal from "../../../context/useModal";
 
 function ModalFooter({ children, className = "", ...props }) {
   return (

@@ -11,7 +11,7 @@ function SidebarContent() {
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              `flex items-center gap-x-5.5 rounded-lg px-8 py-2 cursor-pointer  hover:text-textColor text-xl ${isActive ? "text-primary bg-white" : "text-white"}`
+              `flex items-center gap-x-5.5 rounded-lg px-8 py-2 cursor-pointer  hover:text-textColor text-xl ${isActive ? "text-primary bg-Surface" : "text-white"}`
             }
           >
             <Icon size={20} />

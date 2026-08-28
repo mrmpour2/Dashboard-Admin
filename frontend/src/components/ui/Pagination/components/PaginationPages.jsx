@@ -45,7 +45,7 @@ function PaginationPages() {
     <div className="flex items-center gap-1">
       {pages.map((page, index) =>
         page === DOTS ? (
-          <span key={`dots-${index}`} className="px-2 text-sm text-gray-400">
+          <span key={`dots-${index}`} className="px-2 text-sm text-textMuted">
             {DOTS}
           </span>
         ) : (
@@ -57,7 +57,7 @@ function PaginationPages() {
             className={`px-3 py-1.5 text-sm rounded-md border ${
               page === currentPage
                 ? "border-blue-500 bg-blue-50 text-blue-600 font-medium"
-                : "border-gray-200 hover:bg-gray-50"
+                : "border-Border hover:bg-SurfaceMuted"
             }`}
           >
             {page}

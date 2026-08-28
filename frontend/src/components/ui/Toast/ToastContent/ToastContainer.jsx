@@ -2,7 +2,6 @@ import clsx from "clsx";
 import useToast from "../ToastContext/useToast";
 import ToastItem from "./ToastItem";
 import { toastVariant } from "./ToastVariant";
-import { useEffect } from "react";
 function ToastContainer({ className = "", ...props }) {
   const { toasts, removeToast } = useToast();
 

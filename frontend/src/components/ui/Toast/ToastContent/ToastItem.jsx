@@ -1,19 +1,19 @@
 import { AlertTriangle, Info, XCircle, CheckCircle2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
 
 function ToastItem({ icon, message, id, onClose }) {
   const [isLeaving, setIsLeaving] = useState(false);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsLeaving(true);
     setTimeout(onClose, 200); // مدت زمان باید با duration کلاس زیر هماهنگ باشه
-  };
+  }, [onClose]);
 
   useEffect(() => {
     const timer = setTimeout(handleClose, 4000);
     return () => clearTimeout(timer);
-  }, [id]);
+  }, [id, handleClose]);
 
   const toastIcon = {
     Information: Info,

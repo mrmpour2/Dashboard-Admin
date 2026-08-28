@@ -14,7 +14,7 @@ function DashboardLayout() {
       ms-60
       min-h-screen
       rounded-s-4xl 
-     bg-white
+     bg-Surface
       shadow-xl
   "
       >

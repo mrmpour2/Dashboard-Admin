@@ -13,8 +13,8 @@ function PopoverContent({ side = "top", className = "", children, ...props }) {
       className={clsx(
         "absolute z-50 w-max max-w-xs ",
         variant.content,
-        "rounded-md bg-white px-3 py-1.5 text-xs text-background",
-        "border border-gray-200 shadow-md animate-in fade-in zoom-in-95 duration-150",
+        "rounded-md bg-Surface px-3 py-1.5 text-xs text-background",
+        "border border-Border shadow-md animate-in fade-in zoom-in-95 duration-150",
         className,
       )}
       {...props}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AvatarFallback from "./components/AvatarFallback";
 import AvatarImage from "./components/AvatarImage";
 import clsx from "clsx";

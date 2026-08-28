@@ -1,4 +1,3 @@
-import { useRef, useState } from "react";
 import SignInButton from "../Auth/SignInButton";
 import UserButton from "./components/UserButton";
 import UserDropdown from "./components/UserDropdown";

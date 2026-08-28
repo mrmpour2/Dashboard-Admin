@@ -1,4 +1,4 @@
-import { createBrowserRouter, Outlet } from "react-router";
+import { createBrowserRouter } from "react-router";
 import Home from "../features/Home/Home";
 import Products from "./../features/Products/Products";
 import Users from "./../features/Users/Users";

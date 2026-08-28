@@ -11,8 +11,8 @@ function DropdownRoot({
 }) {
   const { setOpen } = useDropdown();
   const userMenuRef = useRef();
-  if (closeOnOutsideClick) useClickOutside(userMenuRef, () => setOpen(false));
-  if (closeOnEscape) useEscapeKey(() => setOpen(false));
+  useClickOutside(userMenuRef, () => setOpen(false), Boolean(closeOnOutsideClick));
+  useEscapeKey(() => setOpen(false), Boolean(closeOnEscape));
   return (
     <div className={clsx("relative inline-block", className)} ref={userMenuRef}>
       {children}

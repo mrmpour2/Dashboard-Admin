@@ -7,7 +7,7 @@ function TableHeadCell({ children, sortKey }) {
   return (
     <th
       onClick={sortKey ? () => handleSort(sortKey) : undefined}
-      className={`px-4 py-2 text-left font-medium text-gray-600 ${
+      className={`px-4 py-2 text-left font-medium text-textSecondary ${
         sortKey ? "cursor-pointer select-none" : ""
       }`}
     >

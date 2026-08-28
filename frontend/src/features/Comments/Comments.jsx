@@ -1,5 +1,4 @@
-import { Accordion, Toast } from "../../components/ui";
-import ToastContainer from "../../components/ui/Toast/ToastContent/ToastContainer";
+import { Toast } from "../../components/ui";
 import TestTabs from "../ToastPlayground";
 
 function Comments() {
