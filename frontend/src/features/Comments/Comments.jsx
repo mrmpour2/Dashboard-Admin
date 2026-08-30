@@ -1,14 +1,7 @@
-import { Toast } from "../../components/ui";
 import TestTabs from "../ToastPlayground";
 
 function Comments() {
-  return (
-    <>
-      <Toast>
-        <TestTabs />
-      </Toast>
-    </>
-  );
+  return <TestTabs />;
 }
 
 export default Comments;

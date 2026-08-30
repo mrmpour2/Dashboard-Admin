@@ -2,7 +2,8 @@ import { useState } from "react";
 import AvatarFallback from "./components/AvatarFallback";
 import AvatarImage from "./components/AvatarImage";
 import clsx from "clsx";
-function Avatar({ src, name, username, size, className = "", ...props }) {
+
+function Avatar({ src, name, username, size = "md", className = "", ...props }) {
   const [imageError, setImageError] = useState(false);
   const sizeClasses = {
     sm: "size-8",
@@ -13,17 +14,22 @@ function Avatar({ src, name, username, size, className = "", ...props }) {
   const handleImageError = () => {
     setImageError(true);
   };
+
+  // اگر src داده نشده، حتی تلاش برای بارگذاری عکس نمی‌کنیم
+  // (چون <img src={undefined}> همیشه رویداد onError را صادر نمی‌کند)
+  const shouldShowImage = Boolean(src) && !imageError;
+
   return (
-    <div className="relative shrink-0 ">
+    <div className="relative shrink-0">
       <div
         className={clsx(
-          "flex justify-center items-center size-12 rounded-full p-0.5 bg-linear-to-r from-primary to-blue-500",
+          "flex justify-center items-center size-12 rounded-full p-0.5 bg-gradient-brand",
           sizeClasses[size],
           className,
         )}
         {...props}
       >
-        {!imageError ? (
+        {shouldShowImage ? (
           <AvatarImage
             src={src}
             alt={name}
@@ -31,7 +37,7 @@ function Avatar({ src, name, username, size, className = "", ...props }) {
             size={size}
           />
         ) : (
-          <AvatarFallback username={username} />
+          <AvatarFallback username={username || name} />
         )}
       </div>
     </div>

@@ -4,14 +4,14 @@ import TopBar from "./TopBar/TopBar";
 
 function DashboardLayout() {
   return (
-    <main className="min-h-screen bg-slate-100 ">
+    <main className="min-h-screen bg-Background transition-smooth duration-300">
       <SideBar />
 
       <section
         className="
       relative
       z-20
-      ms-60
+      ms-72
       min-h-screen
       rounded-s-4xl 
      bg-Surface

@@ -1,20 +1,30 @@
 import { NavLink } from "react-router";
 import { sidebarItems } from "./sidebarItems";
+
 function SidebarContent() {
   return (
-    <nav className="flex flex-col items-start text-white gap-y-8.25  py-20 font-Vazir font-medium ">
-      {sidebarItems.map((item) => {
+    <nav className="flex flex-col gap-y-1.5 py-2 font-Vazir font-medium">
+      {sidebarItems.map((item, index) => {
         const Icon = item.icon;
 
         return (
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.path === "/"}
+            style={{ animationDelay: `${index * 60}ms` }}
             className={({ isActive }) =>
-              `flex items-center gap-x-5.5 rounded-lg px-8 py-2 cursor-pointer  hover:text-textColor text-xl ${isActive ? "text-primary bg-Surface" : "text-white"}`
+              `animate-fade-in-up group relative flex items-center gap-x-4 rounded-xl px-4 py-2.5 text-[15px] transition-all duration-300 ease-out ${
+                isActive
+                  ? "bg-white text-primary shadow-lg"
+                  : "text-white/75 hover:bg-white/10 hover:text-white"
+              }`
             }
           >
-            <Icon size={20} />
+            <Icon
+              size={19}
+              className="shrink-0 transition-transform duration-300 group-hover:scale-110"
+            />
             <span>{item.title}</span>
           </NavLink>
         );

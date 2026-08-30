@@ -3,16 +3,17 @@ import Logo from "./Logo";
 
 function SidebarHeader() {
   return (
-    <div className="w-full h-17.5 flex justify-center items-center gap-1 mt-4 p-15 -space-x-9">
+    <div className="flex w-full items-center gap-3 px-2 pt-8 pb-6">
       <Logo />
-      <div>
-        <Link
-          to={"/"}
-          className="text-xl font-bold tracking-wide font-Outfit text-white "
-        >
-          MR.MPOUR
-        </Link>
-      </div>
+      <Link
+        to="/"
+        className="flex flex-col leading-tight text-white transition-opacity hover:opacity-90"
+      >
+        <span className="text-lg font-bold tracking-wide font-Outfit">
+          Nebula
+        </span>
+        <span className="text-xs text-white/60">پنل مدیریت</span>
+      </Link>
     </div>
   );
 }
