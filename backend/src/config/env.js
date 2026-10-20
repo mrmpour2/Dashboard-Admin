@@ -47,6 +47,15 @@ const envSchema = z.object({
   CARD_TO_CARD_NUMBER: z.string().trim().default(""),
   CARD_TO_CARD_OWNER: z.string().trim().default(""),
   CARD_TO_CARD_BANK: z.string().trim().default(""),
+  SECURITY_PROVIDER_MODE: z.enum(["disabled", "mock"]).default("disabled"),
+  OTP_HASH_SECRET: z.string().default(""),
+  OTP_DAILY_PHONE_LIMIT: z.coerce.number().int().min(1).default(10),
+  OTP_DAILY_IP_LIMIT: z.coerce.number().int().min(1).default(50),
+  STOCK_ROLLOUT_PERCENT: z.coerce.number().int().min(0).max(100).default(0),
+  STOCK_ONLINE_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  STOCK_WALLET_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+  STOCK_JOB_DRY_RUN: z.enum(["true", "false"]).default("true").transform(v => v === "true"),
+  TRUSTED_PROXY: z.string().default("loopback"),
   CHAT_RECEIPTS_DIR: z.string().trim().default("uploads/chat-receipts"),
 });
 
@@ -72,3 +81,5 @@ if (
 
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === "production";
+
+if (isProd && env.SECURITY_PROVIDER_MODE === "mock") throw new Error("Mock security providers are forbidden in production");

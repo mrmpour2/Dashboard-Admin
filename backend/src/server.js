@@ -1,8 +1,10 @@
+import { startSecurityJobs } from "./services/securityJobs.js";
 import app from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
 import { prisma } from "./config/prisma.js";
 
+const stopSecurityJobs = startSecurityJobs();
 const server = app.listen(env.PORT, () => {
   logger.info(`🚀 سرور روی پورت ${env.PORT} در حالت ${env.NODE_ENV} اجرا شد`);
 });
@@ -10,6 +12,7 @@ const server = app.listen(env.PORT, () => {
 // خاموش‌شدن مرتب (graceful shutdown): درخواست‌های در حال پردازش تمام می‌شوند
 // و اتصال دیتابیس به‌درستی بسته می‌شود، تا داده ناقص/تراکنش نیمه‌کاره باقی نماند
 async function shutdown(signal) {
+  stopSecurityJobs();
   logger.info(`دریافت سیگنال ${signal}، در حال خاموش‌شدن مرتب...`);
   server.close(async () => {
     await prisma.$disconnect();

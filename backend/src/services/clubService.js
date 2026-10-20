@@ -451,7 +451,7 @@ export async function awardOrderPoints(orderId) {
     where: { id: orderId },
     select: { id: true, status: true, customerPhone: true, totalAmount: true, orderNumber: true },
   });
-  if (!order || order.status !== "PAID") return { awarded: 0, balanceAfter: null };
+  if (!order || !["PAID", "CONFIRMED"].includes(order.status)) return { awarded: 0, balanceAfter: null };
 
   const phone = normalizePhone(order.customerPhone);
   if (!phone) return { awarded: 0, balanceAfter: null };

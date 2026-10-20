@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "test:club": "node --test tests/club.test.mjs",
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",

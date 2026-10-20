@@ -17,6 +17,8 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
     coupon,
     order,
     ticket;
+  let checkoutNumber = 10000;
+  let checkoutHeaders = {};
   async function request(
     path,
     {
@@ -28,9 +30,16 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
       origin,
     } = {},
   ) {
+    // Each commerce case uses a distinct verified synthetic buyer. OTP rejection,
+    // verification and abuse limits are tested explicitly by stock.test.mjs.
+    if (path === "/payment/orders" && body?.customerPhone) {
+      body = { ...body, customerPhone: "0912" + String(++checkoutNumber).padStart(7, "0") };
+      checkoutHeaders = fixture.checkoutHeaders(body.customerPhone, `198.51.100.${checkoutNumber % 250}`);
+    }
     const response = await fetch(base + path, {
       method,
       headers: {
+        ...(path.startsWith("/payment/") ? checkoutHeaders : {}),
         ...(body && { "Content-Type": "application/json" }),
         ...(token && { Authorization: `Bearer ${token}` }),
         ...(refreshCookie && { Cookie: refreshCookie }),
@@ -644,7 +653,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         });
         assert.match(checkout.data.order.orderNumber, /^WEB-/);
         assert.equal(checkout.data.order.totalAmount, 250000);
-        assert.equal(checkout.data.order.status, "PENDING_PAYMENT");
+        assert.equal(checkout.data.order.status, "RESERVED");
         await request("/payment/zibal/request", {
           method: "POST",
           token: null,

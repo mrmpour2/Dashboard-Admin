@@ -17,7 +17,7 @@ const app = express();
 
 // در پشت یک reverse proxy (nginx/Cloudflare) اجرا می‌شود، پس به IP واقعی کاربر اعتماد می‌کنیم
 // (لازم برای درست‌کارکردن rate limiting و req.ip)
-app.set("trust proxy", 1);
+app.set("trust proxy", env.TRUSTED_PROXY);
 
 // --- امنیت هدرهای HTTP ---
 app.use(

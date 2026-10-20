@@ -1,3 +1,4 @@
+import { recordStaffSale, reverseStaffSale } from "./stockService.js";
 import crypto from "node:crypto";
 import { prisma } from "../config/prisma.js";
 import { NotFoundError, BadRequestError } from "../utils/AppError.js";
@@ -115,13 +116,7 @@ export async function createOrder({ customerId, items, couponCode }) {
       include: orderInclude,
     });
 
-    for (const item of items) {
-      const reserved = await tx.product.updateMany({
-        where: { id: item.productId, stock: { gte: item.quantity }, isActive: true },
-        data: { stock: { decrement: item.quantity } },
-      });
-      if (reserved.count !== 1) throw new BadRequestError("موجودی محصول تغییر کرده است؛ سفارش را دوباره بررسی کنید");
-    }
+    await recordStaffSale(tx, created.id, items);
 
     return created;
   }, { isolationLevel: "Serializable" });
@@ -138,12 +133,7 @@ export async function updateOrderStatus(id, status) {
     // اگر سفارش لغو می‌شود، موجودی محصولات به انبار بازگردانده می‌شود
     // و اگر کد تخفیفی روی آن اعمال شده بود، شمارش استفاده از آن هم برمی‌گردد
     if (isNewlyCancelled) {
-      for (const item of existing.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
-      }
+      await reverseStaffSale(tx, existing.id, existing.items);
       if (existing.couponId) {
         await tx.coupon.update({
           where: { id: existing.couponId },

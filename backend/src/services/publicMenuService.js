@@ -1,3 +1,4 @@
+import { releaseExpired } from "./stockService.js";
 import { prisma } from "../config/prisma.js";
 import { NotFoundError } from "../utils/AppError.js";
 
@@ -132,6 +133,7 @@ function withUniqueSlugs(products) {
 }
 
 export async function listPublicMenu({ category } = {}) {
+  await releaseExpired({ dryRun: false });
   const filter = typeof category === "string" ? category.trim() : "";
   const products = await prisma.product.findMany({
     where: { isActive: true, ...(filter ? { category: filter } : {}) },
@@ -149,6 +151,7 @@ export async function listPublicMenu({ category } = {}) {
 }
 
 export async function findPublicMenuItem(identifier) {
+  await releaseExpired({ dryRun: false });
   const value = String(identifier ?? "").trim();
   if (!value) throw new NotFoundError("آیتم منو یافت نشد");
 

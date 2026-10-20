@@ -1,3 +1,6 @@
+import { normalizeMobile, digest, lockKeys, securityAudit } from "../services/otpService.js";
+import { reserveStock, transitionReservations, enforceGuestLimits, releaseExpired, finalizeVerifiedPayment, cancelChatOrder } from "../services/stockService.js";
+import { AppError } from "../utils/AppError.js";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -64,7 +67,7 @@ function itemKey(item) {
     ? `${lineKey(item)}::${lineKey(item.parent)}`
     : lineKey(item);
 }
-async function getOrder(orderId) {
+async function getOrder(orderId, req) {
   const order = await prisma.chatOrder.findUnique({
     where: { id: orderId },
     include: {
@@ -75,7 +78,7 @@ async function getOrder(orderId) {
       },
     },
   });
-  if (!order) throw new NotFoundError("سفارش پیدا نشد.");
+  if (!order || (req && order.phoneHash !== digest(req.checkoutPhone))) throw new NotFoundError("سفارش پیدا نشد.");
   return order;
 }
 
@@ -232,8 +235,27 @@ export async function createChatOrder(req, res, next) {
       });
       if (conversation) conversationId = conversation.id;
     }
+    const phone = normalizeMobile(customerPhone);
+    if (phone !== req.checkoutPhone) throw new AppError("شماره سفارش باید همان شماره تأییدشده باشد.", 403, "PHONE_MISMATCH");
+    const rawKey = req.headers["idempotency-key"];
+    if (typeof rawKey !== "string" || !/^[A-Za-z0-9_-]{8,128}$/.test(rawKey)) throw new BadRequestError("شناسه یکتای درخواست لازم است.");
+    const phoneHash = digest(phone), ipHash = digest(req.ip);
+    const idempotencyKey = digest(`${phone}:${rawKey}`);
+    const requestHash = digest(JSON.stringify({ phone, customerName, customerEmail, shippingAddress, normalizedItems }));
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + env.STOCK_ONLINE_TTL_SECONDS * 1000);
+    await releaseExpired({ now, dryRun: false });
+    const bucket = parseInt(phoneHash.slice(0, 8), 16) % 100;
+    if (bucket >= env.STOCK_ROLLOUT_PERCENT) throw new ServiceUnavailableError("ثبت سفارش موقتاً در دسترس نیست.");
     const order = await prisma.$transaction(
       async (tx) => {
+        await lockKeys(tx, [`order:${idempotencyKey}`]);
+        const duplicate = await tx.chatOrder.findUnique({ where: { idempotencyKey }, include: { items: { include: { product: true, parentItem: true } } } });
+        if (duplicate) {
+          if (duplicate.requestHash !== requestHash) throw new AppError("شناسه درخواست برای سفارش دیگری استفاده شده است.", 409, "IDEMPOTENCY_CONFLICT");
+          return duplicate;
+        }
+        await enforceGuestLimits(tx, phoneHash, ipHash, now);
         const products = await tx.product.findMany({
           where: {
             id: { in: normalizedItems.map((item) => item.productId) },
@@ -266,7 +288,7 @@ export async function createChatOrder(req, res, next) {
               "یکی از محصولات وجود ندارد یا غیرفعال است.",
             );
           if (product.stock < needed)
-            throw new BadRequestError(`موجودی «${product.name}» کافی نیست.`);
+            throw new AppError(`موجودی «${product.name}» کافی نیست.`, 409, "OUT_OF_STOCK");
         }
 
         // قیمت و برچسب سایز از دیتابیس خوانده می‌شود؛ قیمت ارسالی مرورگر مرجع نیست.
@@ -327,7 +349,9 @@ export async function createChatOrder(req, res, next) {
             orderNumber: generateOrderNumber(),
             conversationId,
             customerName: customerName.trim(),
-            customerPhone: customerPhone.trim(),
+            customerPhone: phone,
+            phoneHash, ipHash, idempotencyKey, requestHash, expiresAt,
+            status: "RESERVED",
             customerEmail: customerEmail?.trim() || null,
             shippingAddress: shippingAddress.trim(),
             subtotalAmount: subtotal,
@@ -365,16 +389,7 @@ export async function createChatOrder(req, res, next) {
           });
         }
 
-        for (const [productId, needed] of quantityByProduct) {
-          const update = await tx.product.updateMany({
-            where: { id: productId, isActive: true, stock: { gte: needed } },
-            data: { stock: { decrement: needed } },
-          });
-          if (update.count !== 1)
-            throw new BadRequestError(
-              "موجودی یکی از محصولات تغییر کرده است؛ لطفاً سفارش را دوباره ثبت کنید.",
-            );
-        }
+        await reserveStock(tx, created.id, normalizedItems, expiresAt);
         return tx.chatOrder.findUnique({
           where: { id: created.id },
           include: {
@@ -389,7 +404,7 @@ export async function createChatOrder(req, res, next) {
           },
         });
       },
-      { isolationLevel: "Serializable" },
+      { timeout: 15000 },
     );
     res
       .status(201)
@@ -398,6 +413,7 @@ export async function createChatOrder(req, res, next) {
           id: order.id,
           orderNumber: order.orderNumber,
           status: order.status,
+          expiresAt: order.expiresAt,
           totalAmount: moneyToNumber(order.totalAmount),
           currency: "TOMAN",
           items: order.items.map((item) => ({
@@ -413,6 +429,9 @@ export async function createChatOrder(req, res, next) {
         },
       });
   } catch (error) {
+    if (["OUT_OF_STOCK", "IDEMPOTENCY_CONFLICT", "RESERVATION_LIMIT"].includes(error.code)) {
+      await securityAudit(prisma, error.code === "OUT_OF_STOCK" ? "stock.conflict" : "stock.rate_limited", req.checkoutPhone, { code: error.code }).catch(() => {});
+    }
     next(error);
   }
 }
@@ -422,8 +441,9 @@ export async function createZibalRequest(req, res, next) {
     if (!env.ZIBAL_MERCHANT)
       throw new ServiceUnavailableError("درگاه زیبال تنظیم نشده است.");
     const { orderId } = req.body;
-    const order = await getOrder(String(orderId ?? ""));
-    if (order.status !== "PENDING_PAYMENT")
+    const order = await getOrder(String(orderId ?? ""), req);
+    if (order.expiresAt && order.expiresAt <= new Date()) throw new BadRequestError("مهلت رزرو تمام شده است؛ سفارش تازه بسازید.");
+    if (!["PENDING_PAYMENT", "RESERVED"].includes(order.status))
       throw new BadRequestError("این سفارش در وضعیت قابل پرداخت نیست.");
     const existingPending = await prisma.chatPayment.findFirst({
       where: {
@@ -521,6 +541,7 @@ async function verifyZibalPayment(payment, trackId) {
     const award = await safeAwardOrderPoints(payment.orderId);
     return { verified: true, alreadyVerified: true, pointsAwarded: award.awarded };
   }
+  if (["REFUND_PENDING", "REFUNDED"].includes(payment.status)) return { verified: false, refundPending: payment.status === "REFUND_PENDING", refunded: payment.status === "REFUNDED", pointsAwarded: 0 };
   let response;
   try {
     response = await fetch(
@@ -542,37 +563,33 @@ async function verifyZibalPayment(payment, trackId) {
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.result !== 100) {
-    if (data.result === 201)
-      throw new BadRequestError(
-        "تراکنش قبلاً در زیبال تأیید شده، اما در این سفارش تأیید ثبت نشده است؛ پشتیبانی باید آن را بررسی کند.",
-      );
-    await prisma.$transaction(async (tx) => {
-      // Claim the transition before restoring stock. Concurrent callbacks wait
-      // for the row lock and only one can leave PENDING_PAYMENT.
-      const cancelled = await tx.chatOrder.updateMany({
-        where: { id: payment.orderId, status: "PENDING_PAYMENT" },
-        data: { status: "CANCELLED" },
-      });
-      if (cancelled.count === 1) {
-        const order = await tx.chatOrder.findUnique({ where: { id: payment.orderId }, include: { items: true } });
-        for (const item of order.items)
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: item.quantity } },
-          });
+    if (data.result === 201) {
+      const latest = await prisma.chatPayment.findUnique({ where: { id: payment.id } });
+      if (latest.status === "PAID") return { verified: true, alreadyVerified: true, pointsAwarded: 0 };
+      if (["REFUND_PENDING", "REFUNDED"].includes(latest.status)) return { verified: false, refundPending: true, pointsAwarded: 0 };
+      await prisma.securityOutbox.upsert({ where: { key: `reconcile:${payment.id}` }, update: {}, create: {
+        key: `reconcile:${payment.id}`, kind: "ticket", orderId: payment.orderId, paymentId: payment.id, payload: { reason: "gateway_already_verified_without_local_receipt" } } });
+      throw new ServiceUnavailableError("تأیید قبلی درگاه برای تطبیق به پشتیبانی ارجاع شد؛ پرداخت را تکرار نکنید.");
+    }
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM chat_orders WHERE id=${payment.orderId} FOR UPDATE`;
+      const current = await tx.chatPayment.findUnique({ where: { id: payment.id } });
+      if (["PAID", "REFUND_PENDING", "REFUNDED"].includes(current.status)) return;
+      const order = await tx.chatOrder.findUnique({ where: { id: payment.orderId } });
+      if (["PENDING_PAYMENT", "RESERVED"].includes(order.status)) {
+        await transitionReservations(tx, order.id, "released", "payment_failed");
+        await tx.chatOrder.update({ where: { id: order.id }, data: { status: "CANCELLED" } });
       }
-      await tx.chatPayment.updateMany({
-        where: { id: payment.id, status: { not: "PAID" } },
-        data: {
-          status: "FAILED",
-          adminNote: `Zibal verify result: ${String(data.result ?? response.status)}`,
-        },
-      });
+      await tx.chatPayment.update({ where: { id: payment.id }, data: { status: "FAILED" } });
     });
     return { verified: false };
   }
   // نتیجهٔ موفق به‌تنهایی کافی نیست؛ مبلغ بازگشتی باید دقیقاً با مبلغ ذخیره‌شدهٔ سفارش برابر باشد.
+  const storedOrder = await getOrder(payment.orderId);
   if (
+    data.orderId !== storedOrder.orderNumber ||
+    Number(payment.amountToman) !== Number(storedOrder.totalAmount) ||
+    Number(payment.amountRial) !== Math.round(Number(payment.amountToman) * 10) ||
     data.amount == null ||
     !Number.isFinite(Number(data.amount)) ||
     Number(data.amount) !== Number(payment.amountRial)
@@ -585,31 +602,19 @@ async function verifyZibalPayment(payment, trackId) {
           "Zibal verification amount did not match the stored order amount; manual reconciliation required.",
       },
     });
+    await prisma.securityOutbox.upsert({ where: { key: `mismatch:${payment.id}` }, update: {}, create: {
+      key: `mismatch:${payment.id}`, kind: "ticket", orderId: payment.orderId, paymentId: payment.id, payload: { reason: "gateway_identity_or_amount_mismatch" } } });
     throw new BadRequestError(
       "مبلغ تأییدشده با مبلغ سفارش تطبیق ندارد؛ برای بررسی با پشتیبانی تماس بگیرید.",
     );
   }
   // مبلغ و شناسه از رکورد سرور گرفته می‌شوند؛ پارامترهای مرورگر مرجع مبلغ نیستند.
-  await prisma.$transaction(async (tx) => {
-    const paid = await tx.chatOrder.updateMany({
-      where: { id: payment.orderId, status: "PENDING_PAYMENT" },
-      data: { status: "PAID" },
-    });
-    if (paid.count !== 1) {
-      const current = await tx.chatPayment.findUnique({ where: { id: payment.id } });
-      if (current?.status === "PAID") return;
-      throw new BadRequestError("وضعیت سفارش تغییر کرده است؛ پرداخت باید توسط پشتیبانی بررسی شود.");
-    }
-    await tx.chatPayment.update({
-      where: { id: payment.id },
-      data: {
-        status: "PAID",
-        zibalRefNumber: data.refNumber == null ? null : String(data.refNumber),
-      },
-    });
+  const finalized = await prisma.$transaction(async tx => {
+    const result = await finalizeVerifiedPayment(tx, payment);
+    if (result.status === "PAID") await tx.chatPayment.update({ where: { id: payment.id }, data: { zibalRefNumber: data.refNumber == null ? null : String(data.refNumber) } });
+    return result;
   });
-  // سفارش در تراکنش بالا PAID شده است؛ امتیاز از مبلغ ذخیره‌شدهٔ همان سفارش
-  // محاسبه می‌شود، نه از ورودی مرورگر. ثبت idempotent است.
+  if (finalized.status !== "PAID") return { verified: false, refundPending: true, pointsAwarded: 0 };
   const award = await safeAwardOrderPoints(payment.orderId);
   return {
     verified: true,
@@ -666,6 +671,8 @@ export async function zibalCallback(req, res, _next) {
     // این شرط مسیر بازگشت موفق را به صفحهٔ نتیجه هدایت می‌کند.
     if (result?.verified) {
       outcome = "success";
+    } else if (result?.refundPending || result?.refunded) {
+      outcome = "refund_pending";
     }
   } catch (error) {
     // جلوگیری از شکست برنامه با ارور 500 و لاگ خطا
@@ -700,8 +707,8 @@ export async function getPaymentConfig(_req, res) {
 export async function submitCardToCardReceipt(req, res, next) {
   try {
     const { orderId, imageData, transferReference } = req.body;
-    const order = await getOrder(String(orderId ?? ""));
-    if (order.status !== "PENDING_PAYMENT")
+    const order = await getOrder(String(orderId ?? ""), req);
+    if (!["PENDING_PAYMENT", "RESERVED"].includes(order.status))
       throw new BadRequestError("این سفارش در وضعیت قابل پرداخت نیست.");
     if (!env.CARD_TO_CARD_NUMBER || !env.CARD_TO_CARD_OWNER)
       throw new ServiceUnavailableError(
@@ -833,43 +840,24 @@ export async function reviewCardToCardReceipt(req, res, next) {
       throw new NotFoundError("رسید پیدا نشد.");
     if (payment.status !== "PENDING_REVIEW")
       throw new BadRequestError("این رسید قبلاً بررسی شده است.");
-    const updated = await prisma.$transaction(async (tx) => {
-      // All payment finalization locks the order before its payment record.
-      const transitioned = await tx.chatOrder.updateMany({
-        where: { id: payment.orderId, status: "PENDING_PAYMENT" },
-        data: { status: decision === "approve" ? "PAID" : "CANCELLED" },
-      });
-      if (transitioned.count !== 1)
-        throw new BadRequestError("این سفارش در وضعیت قابل بررسی نیست.");
-      const claimed = await tx.chatPayment.updateMany({
-        where: { id: payment.id, status: "PENDING_REVIEW" },
-        data: {
-          status: decision === "approve" ? "PAID" : "REJECTED",
-          adminNote:
-            typeof note === "string" ? note.trim().slice(0, 1000) : null,
-          reviewedById: req.user.id,
-          reviewedAt: new Date(),
-        },
-      });
-      if (claimed.count !== 1)
-        throw new BadRequestError("این رسید قبلاً بررسی شده است.");
-      const order = await tx.chatOrder.findUnique({
-        where: { id: payment.orderId },
-        include: { items: true },
-      });
-      if (decision === "reject") {
-        for (const item of order.items)
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: item.quantity } },
-          });
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM chat_orders WHERE id=${payment.orderId} FOR UPDATE`;
+      const current = await tx.chatPayment.findUnique({ where: { id: payment.id } });
+      if (current.status !== "PENDING_REVIEW") throw new BadRequestError("این رسید قبلاً بررسی شده است.");
+      if (decision === "approve") await finalizeVerifiedPayment(tx, payment, { receipt: true });
+      else {
+        const order = await tx.chatOrder.findUnique({ where: { id: payment.orderId } });
+        if (!["PENDING_PAYMENT", "RESERVED", "EXPIRED"].includes(order.status)) throw new BadRequestError("سفارش در وضعیت قابل بررسی نیست.");
+        await transitionReservations(tx, payment.orderId, "released", "receipt_rejected");
+        await tx.chatOrder.update({ where: { id: payment.orderId }, data: { status: "CANCELLED" } });
+        await tx.chatPayment.update({ where: { id: payment.id }, data: { status: "REJECTED" } });
       }
+      await tx.chatPayment.update({ where: { id: payment.id }, data: { reviewedById: req.user.id, reviewedAt: new Date(),
+        ...(typeof note === "string" ? { adminNote: note.trim().slice(0, 1000) } : {}) } });
       return tx.chatPayment.findUnique({ where: { id: payment.id } });
     });
-    // فقط تأیید رسید، سفارش را PAID می‌کند؛ امتیاز هم بعد از همان تصمیم ثبت
-    // می‌شود. رد رسید هیچ امتیازی نمی‌دهد.
     const award =
-      decision === "approve"
+      updated.status === "PAID"
         ? await safeAwardOrderPoints(payment.orderId)
         : { awarded: 0, balanceAfter: null };
     res.json({
@@ -883,4 +871,11 @@ export async function reviewCardToCardReceipt(req, res, next) {
   } catch (error) {
     next(error);
   }
+}
+
+export async function readGuestOrder(req, res, next) {
+  try { const order = await getOrder(req.params.orderId, req); res.json({ order: { id: order.id, status: order.status, expiresAt: order.expiresAt } }); } catch(error) { next(error); }
+}
+export async function cancelGuestOrder(req, res, next) {
+  try { const order = await getOrder(req.params.orderId, req); const cancelled = await cancelChatOrder(order.id); res.json({ order: { id: cancelled.id, status: cancelled.status } }); } catch(error) { next(error); }
 }
