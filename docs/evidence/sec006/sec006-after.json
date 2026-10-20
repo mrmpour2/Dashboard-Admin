@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-10-20T16:52:37.371Z",
+  "environment": "Disposable loopback PostgreSQL; mock providers; no AI calls",
+  "independentVerification": false,
+  "tests": [
+    {
+      "name": "fabricated PIN creates only a claim; no owner, session or usable points",
+      "passed": true
+    },
+    {
+      "name": "correct OTP releases only matching pending points exactly once; replay and actor swap fail",
+      "passed": true
+    },
+    {
+      "name": "second proven claimant becomes disputed with 409 and gets no points",
+      "passed": true
+    },
+    {
+      "name": "five wrong codes lock challenge; captcha after three and a durable alert",
+      "passed": true
+    },
+    {
+      "name": "different source mobile stays pending even when bound to a verified member",
+      "passed": true
+    },
+    {
+      "name": "existing and absent mobiles receive identical generic responses and a claim cookie only",
+      "passed": true
+    },
+    {
+      "name": "two genuinely concurrent valid claims produce one verified owner",
+      "passed": true
+    },
+    {
+      "name": "actual legacy migration quarantines history; accrual continues, redemption denied, 30-day expiry is read-only",
+      "passed": true
+    },
+    {
+      "name": "clawback records a reason and adjustment once; ledger and security audit are immutable",
+      "passed": true
+    },
+    {
+      "name": "database constraints reject missing ownership proof and a second verified claim",
+      "passed": true
+    },
+    {
+      "name": "OTP is scoped, expires, throttles resend and phone/IP daily issuance",
+      "passed": true
+    }
+  ]
+}

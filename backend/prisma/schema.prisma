@@ -344,6 +344,12 @@ model ClubMember {
   pinHash       String
   // موجودی جاری؛ منبع حقیقت برای نمایش و بررسی استرداد.
   pointsBalance Int       @default(0)
+  verificationStatus String @default("pending") @map("verification_status")
+  verifiedPhone String? @map("verified_phone")
+  verifiedAt DateTime? @map("verified_at")
+  legacyUntil DateTime? @map("legacy_until")
+  legacyPoints Int @default(0) @map("legacy_points")
+  legacyReleasedAt DateTime? @map("legacy_released_at")
   // افزایش این مقدار همهٔ کوکی‌های نشست عضو را باطل می‌کند.
   tokenVersion  Int       @default(0)
   joinedAt      DateTime  @default(now())
@@ -369,6 +375,7 @@ model ClubPointTransaction {
   points       Int
   balanceAfter Int
   description  String?
+  status       String @default("available")
   createdAt    DateTime        @default(now())
 
   @@unique([memberId, source, sourceId])
@@ -614,4 +621,41 @@ model SecurityOutbox {
   createdAt DateTime @default(now()) @map("created_at")
   completedAt DateTime? @map("completed_at")
   @@map("security_outbox")
+}
+
+// Mobile is the club identity; no independent club number is introduced.
+model ClubClaim {
+  id String @id @default(cuid())
+  phone String
+  userId String @map("user_id")
+  name String
+  pinHash String @map("pin_hash")
+  status String @default("pending")
+  memberId String? @map("member_id")
+  challengeId String? @map("challenge_id")
+  verifiedPhone String? @map("verified_phone")
+  verifiedAt DateTime? @map("verified_at")
+  attemptCount Int @default(0) @map("attempt_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@index([phone, createdAt])
+  @@index([userId, createdAt])
+  @@map("club_claims")
+}
+
+model ClubPointAccrual {
+  id String @id @default(cuid())
+  phone String
+  memberId String? @map("member_id")
+  source ClubPointSource
+  sourceId String @map("source_id")
+  points Int
+  status String @default("pending")
+  description String?
+  createdAt DateTime @default(now()) @map("created_at")
+  releasedAt DateTime? @map("released_at")
+  @@unique([source, sourceId])
+  @@index([phone, status])
+  @@index([memberId, status])
+  @@map("club_point_accruals")
 }

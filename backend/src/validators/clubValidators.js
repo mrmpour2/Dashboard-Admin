@@ -19,8 +19,12 @@ export const joinClubSchema = z.object({
     name: z.string().trim().min(2, "نام باید حداقل ۲ نویسه باشد.").max(60),
     phone,
     pin,
+    captchaToken: z.string().max(2048).optional(),
   }),
 });
+
+export const verifyClubClaimSchema = z.object({ body: z.object({ claimId: z.string().min(1).max(100), code: z.string().regex(/^\d{6}$/), captchaToken: z.string().max(2048).optional() }) });
+export const resendClubClaimSchema = z.object({ body: z.object({ claimId: z.string().min(1).max(100), captchaToken: z.string().max(2048).optional() }) });
 
 export const loginClubSchema = z.object({
   params: z.object({}).optional(),

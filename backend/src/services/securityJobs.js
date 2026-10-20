@@ -38,6 +38,11 @@ export async function processSecurityOutbox({ dryRun = env.STOCK_JOB_DRY_RUN } =
   return { dryRun: false, count };
 }
 export async function stockMetrics() {
+  const [disputed, pendingPoints, otpAlerts] = await Promise.all([
+    prisma.clubClaim.count({ where: { status: "disputed" } }),
+    prisma.clubPointAccrual.aggregate({ where: { status: "pending" }, _sum: { points: true } }),
+    prisma.securityOutbox.count({ where: { key: { startsWith: "otp-alert:" }, status: "pending" } }),
+  ]);
   const [created, expired, conflicts, noStock, active, pendingDeliveries, reconciliation] = await Promise.all([
     prisma.stockReservation.count(), prisma.stockReservation.count({ where: { status: "expired" } }),
     prisma.securityAudit.count({ where: { action: "stock.conflict" } }),
@@ -50,7 +55,7 @@ export async function stockMetrics() {
       GROUP BY s.sku_id,s.on_hand,s.reserved,p.stock`,
   ]);
   return { created, expired, expiredRate: created ? expired / created : 0, conflicts, verifiedWithoutStock: noStock,
-    active, pendingDeliveries, reconciliation, alarm: noStock > 0 || pendingDeliveries > 0 || reconciliation.some(r => r.reserved !== r.ledger_reserved || r.available !== r.on_hand - r.reserved) };
+    active, pendingDeliveries, reconciliation, club: { disputed, pendingPoints: pendingPoints._sum.points ?? 0, otpAlerts }, alarm: disputed > 0 || otpAlerts > 0 || noStock > 0 || pendingDeliveries > 0 || reconciliation.some(r => r.reserved !== r.ledger_reserved || r.available !== r.on_hand - r.reserved) };
 }
 export function startSecurityJobs() {
   let running = false;

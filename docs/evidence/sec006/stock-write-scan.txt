@@ -1,0 +1,5 @@
+Source scan: all decrement occurrences. The sole stock decrement is clubReward inventory in clubService, not products. Product on_hand/reserved writes are centralized in stockService SQL.
+dashboard/backend/src/services/clubOwnershipService.js:127: const updated = await tx.clubMember.updateMany({ where: { id: row.memberId, pointsBalance: { gte: row.points } }, data: { pointsBalance: { decrement: row.points } } });
+dashboard/backend/src/services/clubService.js:312: data: { stock: { decrement: 1 } },
+dashboard/backend/src/services/clubService.js:321: data: { pointsBalance: { decrement: reward.costPoints } },
+dashboard/backend/src/services/orderService.js:140: data: { usedCount: { decrement: 1 } },

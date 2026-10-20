@@ -71,6 +71,9 @@ export async function consumeOtp({ challengeId, phone: rawPhone, subject, code, 
     }
     await tx.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 }, ...(valid ? { consumedAt: now } : {}) } });
     await securityAudit(tx, valid ? "otp.verified" : "otp.failed", phone, { attempts: otp.attempts + 1 });
+    if (!valid && otp.attempts + 1 === 3) {
+      await tx.securityOutbox.upsert({ where: { key: `otp-alert:${otp.id}` }, update: {}, create: { key: `otp-alert:${otp.id}`, kind: "notification", orderId: otp.id, payload: { reason: "otp_failed_attempts", phoneHash: otp.phoneHash, subject, attempts: 3 } } });
+    }
     return valid;
   });
   if (outcome !== true) throw new AppError("کد تأیید معتبر نیست یا منقضی شده است.", outcome === "captcha" ? 429 : 400, outcome === "captcha" ? "CAPTCHA_REQUIRED" : "INVALID_OTP");

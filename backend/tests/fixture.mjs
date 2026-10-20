@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
+import { mkdtempSync, cpSync, rmSync } from "node:fs";
+import path from "node:path";
 
-export async function createFixture() {
+export async function createFixture({ beforeClubMigration } = {}) {
   const target = new URL(process.env.DATABASE_URL);
   if (!["127.0.0.1", "localhost"].includes(target.hostname) || target.port !== "55439" || target.pathname !== "/elin_audit") throw new Error("Tests require the disposable localhost:55439/elin_audit database");
   const schema = "dashboard_test_" + randomUUID().replaceAll("-", "");
@@ -32,6 +34,19 @@ export async function createFixture() {
   };
   const client = new PrismaClient({ datasourceUrl: url.href });
   try {
+    if (beforeClubMigration) {
+      const root = fileURLToPath(new URL("..", import.meta.url));
+      const temporary = mkdtempSync(path.join(root, "tests", ".migration-fixture-"));
+      try {
+        cpSync(path.join(root, "prisma", "schema.prisma"), path.join(temporary, "schema.prisma"));
+        cpSync(path.join(root, "prisma", "migrations"), path.join(temporary, "migrations"), { recursive: true, filter: source => !source.includes("20261020020000_verified_club_phone") });
+        execFileSync(process.execPath, [path.join(root, "node_modules/prisma/build/index.js"), "migrate", "deploy", "--schema", path.join(temporary, "schema.prisma")], { cwd: root, env: process.env, stdio: "pipe" });
+        await beforeClubMigration(client);
+      } finally {
+        if (path.dirname(temporary) !== path.join(root, "tests") || !path.basename(temporary).startsWith(".migration-fixture-")) throw new Error("Unsafe temporary migration directory");
+        rmSync(temporary, { recursive: true, force: true });
+      }
+    }
     execFileSync(process.execPath, [fileURLToPath(new URL("../node_modules/prisma/build/index.js", import.meta.url)), "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: process.env, stdio: "pipe" });
     const { hashPassword } = await import("../src/utils/password.js");
     const password = "QaOnly12345";

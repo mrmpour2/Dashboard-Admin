@@ -1,12 +1,14 @@
 import crypto from "node:crypto";
+import { accrueClubPoints, createClubClaim } from "./clubOwnershipService.js";
+import { lockKeys } from "./otpService.js";
 import { prisma } from "../config/prisma.js";
 import { isProd } from "../config/env.js";
-import { comparePassword, hashPassword } from "../utils/password.js";
+import { comparePassword } from "../utils/password.js";
 import {
   BadRequestError,
-  ConflictError,
   NotFoundError,
   UnauthorizedError,
+  ForbiddenError,
 } from "../utils/AppError.js";
 
 /**
@@ -115,11 +117,14 @@ export function toMemberView(member) {
     id: member.id,
     name: member.name,
     phone: member.phone,
-    points: member.pointsBalance,
+    points: member.verificationStatus === "verified" ? member.pointsBalance : 0,
+    verificationStatus: member.verificationStatus,
+    verifiedPhone: member.verifiedPhone,
+    legacyUntil: member.legacyUntil,
     joinedAt: member.joinedAt instanceof Date ? member.joinedAt.toISOString() : member.joinedAt,
     lastLoginAt:
       member.lastLoginAt instanceof Date ? member.lastLoginAt.toISOString() : member.lastLoginAt,
-    tier: tierSnapshot(member.pointsBalance),
+    tier: tierSnapshot(member.verificationStatus === "verified" ? member.pointsBalance : 0),
   };
 }
 
@@ -135,6 +140,7 @@ function toRewardView(reward, member = null) {
   else if (expired) reason = "expired";
   else if (outOfStock) reason = "out_of_stock";
   else if (!member) reason = "login_required";
+  else if (member.verificationStatus !== "verified" || member.verifiedPhone !== member.phone) reason = "verification_required";
   else if (memberRank < requiredRank) reason = "tier_required";
   else if (member.pointsBalance < reward.costPoints) reason = "insufficient_points";
 
@@ -163,6 +169,7 @@ function toTransactionView(transaction) {
     balanceAfter: transaction.balanceAfter,
     description: transaction.description,
     createdAt: transaction.createdAt.toISOString(),
+    status: transaction.status,
   };
 }
 
@@ -185,38 +192,11 @@ function toRedemptionView(redemption) {
   };
 }
 
-/** عضویت تازه. شمارهٔ تکراری خطای ۴۰۹ می‌گیرد تا عضویت قبلی بازنویسی نشود. */
-export async function joinClub({ phone, name, pin }) {
-  const normalizedPhone = normalizePhone(phone);
-  const normalizedPin = normalizePin(pin);
-  assertPhone(normalizedPhone);
-  assertPin(normalizedPin);
-
-  const existing = await prisma.clubMember.findUnique({ where: { phone: normalizedPhone } });
-  if (existing) {
-    throw new ConflictError("این شماره قبلاً در باشگاه ثبت شده است؛ با رمز عضویت وارد شوید.");
-  }
-
-  const pinHash = await hashPassword(normalizedPin);
-  try {
-    return await prisma.clubMember.create({
-      data: {
-        phone: normalizedPhone,
-        name: name.trim(),
-        pinHash,
-        lastLoginAt: new Date(),
-      },
-    });
-  } catch (error) {
-    // دو درخواست هم‌زمان برای یک شماره؛ دومی نباید رکورد تازه بسازد.
-    if (error.code === "P2002") {
-      throw new ConflictError("این شماره قبلاً در باشگاه ثبت شده است؛ با رمز عضویت وارد شوید.");
-    }
-    throw error;
-  }
+/** ادعای مالکیت؛ بدون OTP نشست یا مالکیت ایجاد نمی‌شود. */
+export async function joinClub(input) {
+  return createClubClaim(input);
 }
 
-/** ورود با شماره و رمز. پیام خطا عمداً وجود/نبود شماره را لو نمی‌دهد. */
 export async function loginClub({ phone, pin }) {
   const normalizedPhone = normalizePhone(phone);
   const normalizedPin = normalizePin(pin);
@@ -251,9 +231,11 @@ export async function getClubDashboard(member) {
   ]);
 
   if (!fresh) throw new UnauthorizedError("عضویت پیدا نشد؛ دوباره وارد شوید.");
+  const pending = await prisma.clubPointAccrual.aggregate({ where: { status: "pending", OR: [{ memberId: fresh.id }, { phone: fresh.phone, memberId: null }] }, _sum: { points: true } });
 
   return {
     member: toMemberView(fresh),
+    pendingPoints: (pending._sum.points ?? 0) + (fresh.legacyReleasedAt ? 0 : fresh.legacyPoints),
     transactions: transactions.map(toTransactionView),
     redemptions: redemptions.map(toRedemptionView),
     rewards: await listClubRewards(fresh),
@@ -287,6 +269,8 @@ export async function redeemClubReward({ memberId, rewardId, idempotencyKey }) {
     throw new BadRequestError("شناسهٔ درخواست معتبر نیست؛ صفحه را تازه کنید.");
   }
 
+  const owner = await prisma.clubMember.findUnique({ where: { id: memberId } });
+  if (!owner || owner.verificationStatus !== "verified" || owner.verifiedPhone !== owner.phone) throw new ForbiddenError("برای مصرف امتیاز ابتدا موبایل را با کد پیامکی تأیید کنید.");
   const existing = await prisma.clubRedemption.findUnique({
     where: { memberId_idempotencyKey: { memberId, idempotencyKey } },
     include: { reward: { select: { id: true, code: true, titleFa: true, titleEn: true } } },
@@ -305,9 +289,11 @@ export async function redeemClubReward({ memberId, rewardId, idempotencyKey }) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const result = await prisma.$transaction(async (tx) => {
+        await lockKeys(tx, [`club:phone:${owner.phone}`]);
         const member = await tx.clubMember.findUnique({ where: { id: memberId } });
         if (!member) throw new UnauthorizedError("عضویت پیدا نشد؛ دوباره وارد شوید.");
 
+        if (member.verificationStatus !== "verified" || member.verifiedPhone !== member.phone || !await tx.clubClaim.findFirst({ where: { memberId, phone: member.phone, status: "verified" } })) throw new ForbiddenError("مالکیت موبایل تأیید نشده است.");
         const reward = await tx.clubReward.findUnique({ where: { id: rewardId } });
         if (!reward || !reward.isActive) throw new NotFoundError("این پاداش در دسترس نیست.");
         if (reward.expiresAt && reward.expiresAt.getTime() <= Date.now()) {
@@ -394,74 +380,19 @@ export async function redeemClubReward({ memberId, rewardId, idempotencyKey }) {
 }
 
 /** ثبت امتیاز با دفتر یکتا. اگر قبلاً ثبت شده باشد چیزی اضافه نمی‌شود. */
-async function awardPoints({ memberId, points, source, sourceId, description }) {
-  if (!Number.isInteger(points) || points < 1) return { awarded: 0, balanceAfter: null };
-
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const existing = await tx.clubPointTransaction.findUnique({
-        where: { memberId_source_sourceId: { memberId, source, sourceId } },
-      });
-      if (existing) {
-        return { awarded: 0, balanceAfter: existing.balanceAfter, duplicate: true };
-      }
-
-      const member = await tx.clubMember.update({
-        where: { id: memberId },
-        data: { pointsBalance: { increment: points } },
-      });
-
-      await tx.clubPointTransaction.create({
-        data: {
-          memberId,
-          type: "EARN",
-          source,
-          sourceId,
-          points,
-          balanceAfter: member.pointsBalance,
-          description,
-        },
-      });
-
-      return { awarded: points, balanceAfter: member.pointsBalance, duplicate: false };
-    });
-  } catch (error) {
-    // درخواست هم‌زمان دیگری همین منبع را ثبت کرده است.
-    if (error.code === "P2002") {
-      const existing = await prisma.clubPointTransaction.findUnique({
-        where: { memberId_source_sourceId: { memberId, source, sourceId } },
-      });
-      return {
-        awarded: 0,
-        balanceAfter: existing?.balanceAfter ?? null,
-        duplicate: true,
-      };
-    }
-    if (error.code === "P2025") return { awarded: 0, balanceAfter: null };
-    throw error;
-  }
-}
-
-/**
- * امتیاز سفارش فقط وقتی ثبت می‌شود که سفارش واقعاً `PAID` باشد. سفارش لغوشده
- * یا در انتظار پرداخت هیچ امتیازی نمی‌گیرد. مبلغ از دیتابیس خوانده می‌شود.
- */
 export async function awardOrderPoints(orderId) {
   const order = await prisma.chatOrder.findUnique({
     where: { id: orderId },
     select: { id: true, status: true, customerPhone: true, totalAmount: true, orderNumber: true },
   });
-  if (!order || !["PAID", "CONFIRMED"].includes(order.status)) return { awarded: 0, balanceAfter: null };
+  if (!order || !["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"].includes(order.status)) return { awarded: 0, balanceAfter: null };
 
   const phone = normalizePhone(order.customerPhone);
   if (!phone) return { awarded: 0, balanceAfter: null };
 
-  const member = await prisma.clubMember.findUnique({ where: { phone }, select: { id: true } });
-  if (!member) return { awarded: 0, balanceAfter: null };
-
   const points = Math.floor(Number(order.totalAmount) / POINTS_PER_TOMAN);
-  return awardPoints({
-    memberId: member.id,
+  return accrueClubPoints({
+    phone,
     points,
     source: "ORDER",
     sourceId: order.id,
@@ -475,7 +406,10 @@ export async function awardOrderPoints(orderId) {
  */
 export async function awardReviewPoints(reviewId, memberId) {
   if (!memberId) return { awarded: 0, balanceAfter: null };
-  return awardPoints({
+  const review = await prisma.review.findUnique({ where: { id: reviewId } });
+  if (!review || review.status !== "APPROVED") return { awarded: 0, pending: 0 };
+  return accrueClubPoints({
+    phone: review.authorPhone,
     memberId,
     points: POINTS_PER_REVIEW,
     source: "REVIEW",

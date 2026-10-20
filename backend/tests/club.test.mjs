@@ -26,6 +26,7 @@ test("Club API awards, redeems and protects points", async (t) => {
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
+  const { mockDeliveries } = await import("../src/services/securityProviders.js");
   let clubCookie = "";
   let adminToken = "";
   let member;
@@ -71,10 +72,15 @@ test("Club API awards, redeems and protects points", async (t) => {
         status: 400,
       });
 
-      const { data, response } = await request("/public/club/join", {
+      const pending = await request("/public/club/join", {
         method: "POST",
         body: { name: "مهمان آزمایشی", phone: "۰۹۱۲ ۳۴۵ ۶۷۸۹", pin: "۱۲۳۴" },
-        status: 201,
+        status: 202,
+      });
+      assert.equal(pending.data.member, undefined);
+      const { data, response } = await request("/public/club/claims/verify", {
+        method: "POST", cookie: cookieFrom(pending.response),
+        body: { claimId: pending.data.claim.claimId, code: mockDeliveries.at(-1).code },
       });
       member = data.member;
       assert.equal(member.phone, "09123456789");
@@ -87,11 +93,6 @@ test("Club API awards, redeems and protects points", async (t) => {
       clubCookie = cookieFrom(response);
       assert.ok(clubCookie.startsWith("club_token="));
 
-      await request("/public/club/join", {
-        method: "POST",
-        body: { name: "تکراری", phone: "09123456789", pin: "1234" },
-        status: 409,
-      });
     });
 
     await t.test("login, dashboard and private endpoints require the session", async () => {

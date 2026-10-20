@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-10-20T16:55:54.213162+00:00",
+  "url": "http://127.0.0.1:5188/loyalty",
+  "environment": "Static isolated UI with synthetic legacy member, GET-only mock API; VITE_API_BASE_URL=/api",
+  "readOnly": true,
+  "checks": [
+    "Verified ownership form and PIN label are visible",
+    "Usable balance is zero; pending balance 50 is visible",
+    "No form submitted and no actual provider called"
+  ],
+  "screenshot": "sec006-ui-legacy.jpg",
+  "limitations": [
+    "Read-only visual inspection; OTP submission covered by API tests",
+    "No full browser end-to-end checkout or accessibility certification"
+  ]
+}
