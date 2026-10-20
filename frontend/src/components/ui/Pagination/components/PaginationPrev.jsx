@@ -1,19 +1,23 @@
 import usePagination from "../context/usePagination";
 
-function PaginationPrev({ children = "Previous" }) {
+const PaginationPrev = ({ children = "قبلی", className = "" }) => {
   const { currentPage, onPageChange } = usePagination();
   const isDisabled = currentPage <= 1;
 
   return (
     <button
       type="button"
-      onClick={() => onPageChange(currentPage - 1)}
       disabled={isDisabled}
-      className="px-3 py-1.5 text-sm rounded-md border border-Border disabled:opacity-40 disabled:cursor-not-allowed hover:bg-SurfaceMuted"
+      onClick={() => onPageChange(currentPage - 1)}
+      className={`px-3 py-2 rounded border text-sm font-medium transition-colors ${
+        isDisabled
+          ? "opacity-50 cursor-not-allowed bg-SurfaceMuted text-textSecondary border-Border"
+          : "bg-Surface text-textPrimary border-Border hover:bg-SurfaceMuted"
+      } ${className}`}
     >
       {children}
     </button>
   );
-}
+};
 
 export default PaginationPrev;

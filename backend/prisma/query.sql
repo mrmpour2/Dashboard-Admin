@@ -1,0 +1,4 @@
+SELECT
+    version(),
+    current_database(),
+    current_user;

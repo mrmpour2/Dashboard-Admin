@@ -1,71 +1,11 @@
-import { Card, Avatar, Badge } from "../../../components/ui";
-
-const activities = [
-  {
-    id: 1,
-    name: "سارا احمدی",
-    action: "سفارش جدیدی ثبت کرد",
-    time: "۵ دقیقه پیش",
-    status: "success",
-    statusLabel: "تکمیل شد",
-  },
-  {
-    id: 2,
-    name: "علی رضایی",
-    action: "تیکت پشتیبانی باز کرد",
-    time: "۲۲ دقیقه پیش",
-    status: "warning",
-    statusLabel: "در انتظار",
-  },
-  {
-    id: 3,
-    name: "محمد کریمی",
-    action: "پروفایل خود را ویرایش کرد",
-    time: "۱ ساعت پیش",
-    status: "brand",
-    statusLabel: "بروزرسانی",
-  },
-  {
-    id: 4,
-    name: "نگار حسینی",
-    action: "بازخورد منفی ثبت کرد",
-    time: "۳ ساعت پیش",
-    status: "danger",
-    statusLabel: "بررسی نشده",
-  },
-];
-
-function RecentActivity() {
-  return (
-    <Card className="animate-fade-in-up p-5 text-right" style={{ animationDelay: "340ms" }}>
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-bold text-textPrimary">فعالیت‌های اخیر</h3>
-        <button className="text-xs font-medium text-primary hover:underline">
-          مشاهده همه
-        </button>
-      </div>
-
-      <ul className="flex flex-col gap-1">
-        {activities.map((item, index) => (
-          <li
-            key={item.id}
-            className="animate-fade-in-up flex items-center gap-3 rounded-xl p-2.5 transition-colors duration-200 hover:bg-SurfaceMuted"
-            style={{ animationDelay: `${380 + index * 70}ms` }}
-          >
-            <Avatar name={item.name} size="sm" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-textPrimary">
-                {item.name}
-                <span className="font-normal text-textSecondary"> {item.action}</span>
-              </p>
-              <p className="text-xs text-textMuted">{item.time}</p>
-            </div>
-            <Badge variant={item.status}>{item.statusLabel}</Badge>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
+import { Link } from "react-router";
+import Card from "../../../components/ui/Card/Card";
+import Badge from "../../../components/ui/Badge/Badge";
+import { orderStatusLabels } from "../../../utils/enumLabels";
+const number = new Intl.NumberFormat("fa-IR");
+const variants = { PENDING: "warning", PROCESSING: "info", SHIPPED: "brand", DELIVERED: "success", CANCELLED: "danger" };
+export default function RecentActivity({ orders }) {
+  return <Card className="p-5 text-start"><div className="flex items-center justify-between gap-3"><h2 className="font-bold text-textPrimary">آخرین سفارش‌ها</h2><Link to="/orders" className="text-xs font-medium text-primary hover:underline">همهٔ سفارش‌ها</Link></div>
+    {orders.length ? <ul className="mt-4 divide-y divide-Border">{orders.map((order) => <li key={order.id} className="flex items-center justify-between gap-3 py-4"><div className="min-w-0"><p className="truncate text-sm font-medium">{order.customer?.name}</p><p className="mt-1 truncate text-xs text-textSecondary" dir="ltr">{order.orderNumber}</p><p className="mt-2 text-sm">{number.format(order.totalAmount)} تومان</p></div><Badge variant={variants[order.status]}>{orderStatusLabels[order.status]}</Badge></li>)}</ul> : <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-textSecondary"><p>هنوز سفارشی ثبت نشده است.</p><Link to="/orders" className="text-primary">ثبت اولین سفارش</Link></div>}
+  </Card>;
 }
-
-export default RecentActivity;

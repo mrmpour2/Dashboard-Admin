@@ -2,11 +2,16 @@ import usePagination from "../context/usePagination";
 
 const DOTS = "...";
 
-function getPageRange(currentPage, totalPages, siblingCount) {
-  const totalVisible = siblingCount * 2 + 5; // first + last + current + 2 dots
+const range = (start, end) => {
+  const length = end - start + 1;
+  return Array.from({ length }, (_, index) => start + index);
+};
+
+const getPageRange = ({ totalPages, currentPage, siblingCount }) => {
+  const totalVisible = siblingCount * 2 + 5;
 
   if (totalPages <= totalVisible) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
+    return range(1, totalPages);
   }
 
   const leftSibling = Math.max(currentPage - siblingCount, 1);
@@ -17,55 +22,54 @@ function getPageRange(currentPage, totalPages, siblingCount) {
 
   if (!showLeftDots && showRightDots) {
     const leftCount = 3 + siblingCount * 2;
-    const leftRange = Array.from({ length: leftCount }, (_, i) => i + 1);
-    return [...leftRange, DOTS, totalPages];
+    return [...range(1, leftCount), DOTS, totalPages];
   }
 
   if (showLeftDots && !showRightDots) {
     const rightCount = 3 + siblingCount * 2;
-    const rightRange = Array.from(
-      { length: rightCount },
-      (_, i) => totalPages - rightCount + i + 1
-    );
-    return [1, DOTS, ...rightRange];
+    return [1, DOTS, ...range(totalPages - rightCount + 1, totalPages)];
   }
 
-  const middleRange = Array.from(
-    { length: rightSibling - leftSibling + 1 },
-    (_, i) => leftSibling + i
-  );
-  return [1, DOTS, ...middleRange, DOTS, totalPages];
-}
+  return [1, DOTS, ...range(leftSibling, rightSibling), DOTS, totalPages];
+};
 
-function PaginationPages() {
-  const { currentPage, totalPages, onPageChange, siblingCount } = usePagination();
-  const pages = getPageRange(currentPage, totalPages, siblingCount);
+const PaginationPages = ({ className = "" }) => {
+  const { currentPage, totalPages, siblingCount, onPageChange } = usePagination();
+
+  const pages = getPageRange({ totalPages, currentPage, siblingCount });
 
   return (
-    <div className="flex items-center gap-1">
-      {pages.map((page, index) =>
-        page === DOTS ? (
-          <span key={`dots-${index}`} className="px-2 text-sm text-textMuted">
-            {DOTS}
-          </span>
-        ) : (
-          <button
-            key={page}
-            type="button"
-            onClick={() => onPageChange(page)}
-            aria-current={page === currentPage ? "page" : undefined}
-            className={`px-3 py-1.5 text-sm rounded-md border ${
-              page === currentPage
-                ? "border-blue-500 bg-blue-50 text-blue-600 font-medium"
-                : "border-Border hover:bg-SurfaceMuted"
-            }`}
-          >
-            {page}
-          </button>
-        )
-      )}
-    </div>
+    <ul className={`flex items-center gap-1 ${className}`}>
+      {pages.map((page, index) => {
+        if (page === DOTS) {
+          return (
+            <li key={`dots-${index}`} className="px-3 py-2 text-gray-400 select-none">
+              {DOTS}
+            </li>
+          );
+        }
+
+        const isActive = page === currentPage;
+
+        return (
+          <li key={page}>
+            <button
+              type="button"
+              onClick={() => onPageChange(page)}
+              aria-current={isActive ? "page" : undefined}
+              className={`px-3 py-2 rounded border text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-primary text-white border-primary"
+                  : "bg-Surface text-textPrimary border-Border hover:bg-SurfaceMuted"
+              }`}
+            >
+              {page.toLocaleString("fa-IR")}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
-}
+};
 
 export default PaginationPages;

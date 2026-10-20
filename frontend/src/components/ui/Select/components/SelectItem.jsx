@@ -27,7 +27,7 @@ function SelectItem({
       setOpen(false);
     }
   };
-  const isSelected = selectValue === value;
+  const isSelected = selectValue?.value === value;
   return (
     <button
       role="option"

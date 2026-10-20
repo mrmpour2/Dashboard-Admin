@@ -1,183 +1,86 @@
-import { Dropdown } from "../../../../components/ui";
 import UserMenuItem from "./UserMenuItem";
 import useTheme from "../../../Theme/useTheme";
-import {
-  ChevronLeft,
-  Mail,
-  X,
-  Moon,
-  Sun,
-} from "lucide-react";
+import { LogOut, Moon, Sun } from "lucide-react";
 
 function UserDropdown({ userMenuData, user }) {
   const { isDark, toggleTheme } = useTheme();
-
-  const Icon = user.icon;
+  const links = userMenuData.filter((item) => item.type === "link");
+  const logoutItem = userMenuData.find((item) => item.action === "logout");
 
   return (
-    <div
-      className="mt-1.5 w-80 bg-Surface/95 dark:bg-slate-900/95 
-           backdrop-blur-xl
-           rounded-2xl shadow-2xl 
-           border border-white/20 dark:border-slate-700/50
-           overflow-auto
-          "
-    >
-      {/* <!-- هدر پروفایل ادمین --> */}
-      <header className="relative px-5 pt-6 pb-4 bg-linear-to-r from-amber-500/10 to-transparent">
-        <div className="items-center gap-4">
-          {/* <!-- آواتار ادمین --> */}
-          <div className="flex ">
-            {/* <!-- نشان ادمین (کوچک) --> */}
-            <div className="inline-flex items-center justify-between gap-1  bg-amber-500 rounded-full p-1.5 border-2 border-white dark:border-slate-900">
-              <Icon size={15} color="#fff" />
-              <span className="text-xs text-white  font-medium">
-                {user.role}
-              </span>
-            </div>
+    <div className="mt-1.5 w-80 h-auto  rounded-2xl border border-Border bg-Surface shadow-2xl overflow-y-auto p-3 max-h-[60vh] scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent hover:scrollbar-thumb-primary/50">
+      <header className="border-b border-Border bg-linear-to-r from-primary/10 to-transparent px-5 py-5">
+        <div className="flex items-center gap-3">
+          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <span className="text-sm font-bold">{user.name?.slice(0, 1)}</span>
           </div>
-
-          {/* <!-- اطلاعات ادمین --> */}
-          <div className="flex-1 ">
-            <div className="flex items-center gap-1 mt-0.5"></div>
-            <div className="flex items-center gap-1 mt-0.5">
-              <div className="w-3 h-3 text-amber-500">
-                <Mail size={12} />
-              </div>
-              <span className="text-xs text-textMuted dark:text-textMuted">
-                {user.email}
-              </span>
-            </div>
+          <div className="min-w-0">
+            <p className="truncate font-bold text-textPrimary">{user.name}</p>
+            <p className="truncate text-xs text-textMuted" dir="ltr">
+              {user.email}
+            </p>
           </div>
         </div>
-
-        {/* <!-- آمار مدیریتی (مناسب ادمین) --> */}
-        <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-Border dark:border-slate-700/50">
-          <div className="text-center">
-            <p className="text-lg font-bold text-textPrimary">
-              ۱,۲۴۷
-            </p>
-            <p className="text-xs text-textMuted dark:text-textMuted">
-              کل کاربران
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-lg font-bold text-textPrimary">۳</p>
-            <p className="text-xs text-textMuted dark:text-textMuted">
-              کل تیکت ها
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-lg font-bold text-textPrimary">
-              ۱۲
-            </p>
-            <p className="text-xs text-textMuted dark:text-textMuted">
-              محصولات جدید
-            </p>
-          </div>
+        <div className="mt-4 inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          {user.role}
         </div>
       </header>
 
-      {/* <!-- منوی تنظیمات ادمین --> */}
-      <main className="p-3 space-y-1 flex flex-col   ">
-        {userMenuData.map((item) => (
-          <Dropdown.Item key={item.id}>
-            <UserMenuItem item={item} />
-          </Dropdown.Item>
+      <main className="space-y-1 p-3 ">
+        {links.map((item) => (
+          <UserMenuItem key={item.id} item={item} />
         ))}
-      </main>
-      <div>
-        {userMenuData.map(
-          (item) =>
-            item.type === "action" && (
-              <div
-                className="flex justify-between items-center p-4 p  text-textSecondary"
-                key={item.id}
-              >
-                <div className="flex ">
-                  <span className=" font-medium  text-textSecondary dark:text-textMuted hover:bg-amber-50 dark:hover:bg-amber-900/20">
-                    {item.title}
-                  </span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isDark}
-                    onChange={toggleTheme}
-                    className="sr-only"
-                  />
 
-                  {/* Track */}
-                  <div
-                    className={` relative w-20 h-10 rounded-full transition-all duration-500
-      ${
-        isDark
-          ? "bg-linear-to-r from-blue-400 to-primary"
-          : "bg-linear-to-r from-yellow-300 to-orange-400"
-      }
-    `}
-                  >
-                    {/* Thumb */}
-                    <div
-                      className={` absolute top-1 flex h-8 w-8 items-center justify-center rounded-full bg-Surface shadow-md transition-all duration-500
-        ${isDark ? "left-11" : "left-1"}
-      `}
-                    >
-                      {isDark ? (
-                        <Moon size={18} className="text-primary" />
-                      ) : (
-                        <Sun size={18} className="text-orange-500" />
-                      )}
-                    </div>
-                  </div>
-                </label>
-              </div>
-            ),
-        )}
-      </div>
-
-      {/* <!-- اطلاعات سیستم و نسخه --> */}
-      <div className="px-4 py-2 bg-SurfaceMuted dark:bg-slate-800/50 border-y border-Border dark:border-slate-700/50">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-textMuted dark:text-textMuted">نسخه سیستم</span>
-          <span className="font-mono text-amber-600 dark:text-amber-400">
-            v2.5.0
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-xs mt-1">
-          <span className="text-textMuted dark:text-textMuted">آخرین ورود</span>
-          <span className="text-textSecondary dark:text-textMuted">
-            ۱۴۰۴/۰۲/۱۰ - ۱۴:۳۰
-          </span>
-        </div>
-      </div>
-
-      {/* <!-- دکمه خروج از سیستم --> */}
-      <footer className="p-3">
-        <div className="exit-admin w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all duration-200 group/exit">
+        <div className="flex items-center justify-between rounded-xl px-3 py-3 text-textSecondary">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <div className="w-4 h-4 text-red-600 dark:text-red-400">
-                <X size={18} />
-              </div>
-            </div>
+            <span className="grid size-8 place-items-center rounded-lg bg-SurfaceMuted">
+              {isDark ? <Moon size={17} /> : <Sun size={17} />}
+            </span>
             <div>
-              <span className="text-sm font-medium text-red-600 dark:text-red-400">
-                خروج از سیستم
-              </span>
-              <p className="text-xs text-red-400 dark:text-red-500">
-                برای امنیت بیشتر
+              <p className="text-sm font-medium text-textPrimary">تغییر تم</p>
+              <p className="text-xs text-textMuted">
+                {isDark ? "حالت تاریک" : "حالت روشن"}
               </p>
             </div>
           </div>
-          <div className="w-4 h-4 text-red-400 group-hover/exit:translate-x-1 transition-transform">
-            <ChevronLeft size={18} />
-          </div>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label="تغییر حالت نمایش"
+            aria-pressed={isDark}
+            className="relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full bg-primary/20 p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <span
+              className={`absolute top-1/2 size-5 -translate-y-1/2 rounded-full bg-Surface shadow transition-all duration-300 ${
+                isDark ? "inset-s-1" : "inset-s-6"
+              }`}
+            />
+          </button>
         </div>
-      </footer>
+      </main>
 
-      {/* <!-- خط تزئینی --> */}
-      <div className="h-0.5 bg-linear-to-r from-transparent via-amber-500 to-transparent"></div>
+      {logoutItem && (
+        <footer className="border-t border-Border p-3">
+          <button
+            type="button"
+            onClick={logoutItem.onClick}
+            disabled={logoutItem.disabled}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-Danger transition hover:bg-Danger/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className="grid size-8 place-items-center rounded-lg bg-Danger/10">
+              <LogOut size={17} />
+            </span>
+            <span>
+              <span className="block text-sm font-medium">
+                {logoutItem.disabled ? "در حال خروج..." : "خروج از حساب"}
+              </span>
+              <span className="block text-xs text-textMuted">
+                پایان امن نشست کاربری
+              </span>
+            </span>
+          </button>
+        </footer>
+      )}
     </div>
   );
 }

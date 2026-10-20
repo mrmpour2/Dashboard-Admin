@@ -29,21 +29,11 @@ const ComboboxTrigger = forwardRef(function ComboboxTrigger(
     }
   };
 
-  const handleKeyDown = (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      toggle();
-    }
-  };
-
   return (
     <div
       {...props}
       ref={ref}
-      role="button"
-      tabIndex={0}
       onClick={handleClick}
-      onKeyDown={handleKeyDown}
       className={clsx(
         "max-w-3xs flex rounded-md items-center justify-between",
         "font-Vazir font-medium cursor-pointer",

@@ -9,20 +9,23 @@ function Button({
   loading = false,
   variant = "primary",
   className = "",
+  disabled = false,
+  type = "button",
   ...props
 }) {
   return (
     <button
+      type={type}
       className={clsx(
         "flex items-center justify-center gap-1 rounded-xl font-medium transition-all duration-200 ",
         buttonSizes[size],
-        buttonVariants[variant],
+        buttonVariants[variant] ?? buttonVariants.secondary,
         {
           "opacity-50 cursor-not-allowed": loading,
         },
         className,
       )}
-      disabled={loading}
+      disabled={loading || disabled}
       {...props}
     >
       {icon && <IconButton icon={icon} />}

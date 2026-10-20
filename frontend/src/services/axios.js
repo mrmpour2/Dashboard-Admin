@@ -25,7 +25,7 @@ let refreshPromise = null;
 async function refreshAccessToken() {
   if (!refreshPromise) {
     refreshPromise = axios
-      .post(`${baseURL}/auth/refresh`, null, { withCredentials: true })
+      .post(`${baseURL}/auth/refresh`, null, { withCredentials: true, timeout: 15_000 })
       .then((res) => {
         const newToken = res.data?.accessToken;
         setAccessToken(newToken);
@@ -45,7 +45,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     const status = error.response?.status;
 
-    if (status === 401 && !originalRequest._retry && !originalRequest.url?.includes("/auth/")) {
+    if (status === 401 && originalRequest && !originalRequest._retry && !/\/auth\/(login|refresh|logout)/.test(originalRequest.url || "")) {
       originalRequest._retry = true;
       try {
         const newToken = await refreshAccessToken();
@@ -53,6 +53,7 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return api(originalRequest);
         }
+        throw new Error("نشست منقضی شده است");
       } catch {
         clearAccessToken();
         window.dispatchEvent(new CustomEvent("auth:session-expired"));

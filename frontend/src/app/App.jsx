@@ -4,8 +4,9 @@ import ThemeProvider from "../layouts/Theme/ThemeProvider";
 import ToastProvider from "../components/ui/Toast/ToastContext/ToastProvider";
 import ToastContainer from "../components/ui/Toast/ToastContent/ToastContainer";
 import Router from "./Routers";
+import ErrorBoundary from "./ErrorBoundary";
+import { AuthProvider } from "../auth/AuthContext";
 
-// یک instance واحد در سطح ماژول تا با هر رندر دوباره ساخته نشود
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -18,14 +19,18 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ToastProvider>
-          <RouterProvider router={Router} />
-          <ToastContainer />
-        </ToastProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <RouterProvider router={Router} />
+              <ToastContainer />
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

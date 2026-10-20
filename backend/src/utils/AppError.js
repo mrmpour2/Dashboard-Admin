@@ -40,3 +40,9 @@ export class ConflictError extends AppError {
     super(message, 409, "CONFLICT");
   }
 }
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message = "سرویس مورد نیاز در دسترس نیست") {
+    super(message, 503, "SERVICE_UNAVAILABLE");
+  }
+}

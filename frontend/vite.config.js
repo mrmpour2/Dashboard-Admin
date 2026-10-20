@@ -28,10 +28,10 @@ export default defineConfig({
     },
   },
   server: {
-    // تنظیم proxy برای جلوگیری از مشکلات CORS در توسعه (بک‌اند روی پورت 4000)
+    // تنظیم proxy برای جلوگیری از مشکلات CORS در توسعه (بک‌اند Express روی پورت ۵۰۰۰)
     proxy: {
       "/api": {
-        target: "http://localhost:4000",
+        target: process.env.VITE_DEV_API_TARGET || "http://localhost:5000",
         changeOrigin: true,
       },
     },

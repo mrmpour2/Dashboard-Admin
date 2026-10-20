@@ -1,36 +1,62 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import TableContext from "./TableContext";
 
-function TableProvider({ children }) {
-  const [selectedRowIds, setSelectedRowIds] = useState(new Set());
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+function TableProvider({
+  children,
+  selectable = false,
+  selectedRowIds: controlledSelectedRowIds,
+  onSelectionChange,
+  sortConfig: controlledSortConfig,
+  onSortChange,
+}) {
+  const [internalSelectedRowIds, setInternalSelectedRowIds] = useState(() => new Set());
+  const [rowIds, setRowIds] = useState([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [internalSortConfig, setInternalSortConfig] = useState({ key: null, direction: null });
+  const sortConfig = controlledSortConfig ?? internalSortConfig;
 
-  const toggleRowSelection = (rowId) => {
-    setSelectedRowIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(rowId)) {
-        next.delete(rowId);
-      } else {
-        next.add(rowId);
-      }
-      return next;
-    });
-  };
+  const selectedRowIds = controlledSelectedRowIds ?? internalSelectedRowIds;
 
-  const handleSort = (key) => {
-    setSortConfig((prev) => {
-      if (prev.key !== key) return { key, direction: "asc" };
-      if (prev.direction === "asc") return { key, direction: "desc" };
-      return { key: null, direction: null };
-    });
-  };
+  const setSelection = useCallback(
+    (next) => {
+      if (controlledSelectedRowIds === undefined) setInternalSelectedRowIds(next);
+      onSelectionChange?.(next);
+    },
+    [controlledSelectedRowIds, onSelectionChange],
+  );
 
-  const value = {
-    selectedRowIds,
-    toggleRowSelection,
-    sortConfig,
-    handleSort,
-  };
+  const toggleRowSelection = useCallback(
+    (rowId) => {
+      if (!selectable) return;
+      const next = new Set(selectedRowIds);
+      if (next.has(String(rowId))) next.delete(String(rowId));
+      else next.add(String(rowId));
+      setSelection(next);
+    },
+    [selectable, selectedRowIds, setSelection],
+  );
+
+  const handleSort = useCallback((key) => {
+    const next = sortConfig.key !== key ? { key, direction: "asc" } : sortConfig.direction === "asc" ? { key, direction: "desc" } : { key: null, direction: null };
+    if (controlledSortConfig !== undefined) onSortChange?.(next);
+    else setInternalSortConfig(next);
+  }, [controlledSortConfig, onSortChange, sortConfig]);
+
+  const value = useMemo(
+    () => ({
+      selectable,
+      globalFilter,
+      setGlobalFilter,
+      selectedRowIds,
+      setSelection,
+      toggleRowSelection,
+      rowIds,
+      setRowIds,
+      sortConfig,
+      handleSort,
+    }),
+    [selectable, globalFilter, selectedRowIds, setSelection, toggleRowSelection, rowIds, sortConfig, handleSort],
+  );
 
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
 }

@@ -7,7 +7,7 @@ function Card({ children, className = "", loading = false, ...props }) {
   return (
     <div
       className={clsx(
-        "relative bg-Surface font-Vazir text-center rounded-Card shadow-Card border border-Border transition-smooth duration-300 hover:shadow-Glow/40",
+        "relative bg-Surface font-Vazir text-center rounded-Card shadow-Card border border-Border ",
         className,
       )}
       {...props}

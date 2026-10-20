@@ -1,14 +1,36 @@
+import clsx from "clsx";
 import SidebarHeader from "./components/SidebarHeader";
 import SidebarContent from "./components/SidebarContent";
 
-function SideBar() {
+function SideBar({ mobileOpen = false, onClose }) {
   return (
-    <aside className="fixed inset-y-0 inset-s-0 z-10 h-screen w-72 overflow-y-auto bg-gradient-brand px-5 shadow-Glow">
-      <div className="flex flex-col divide-y divide-white/10">
-        <SidebarHeader />
-        <SidebarContent />
-      </div>
-    </aside>
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="بستن منوی کناری"
+          onClick={onClose}
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+        />
+      )}
+
+      <aside
+        aria-label="منوی اصلی"
+        className={clsx(
+          "fixed inset-y-0 start-0 z-40 h-screen w-64 overflow-y-auto border-e border-Border bg-Surface px-4 transition-transform duration-200",
+          "ltr:md:translate-x-0 rtl:md:translate-x-0",
+          mobileOpen
+            ? "translate-x-0"
+            : "hidden md:block ltr:-translate-x-full rtl:translate-x-full md:translate-x-0",
+        )}
+      >
+        <div className="flex min-h-full flex-col">
+          <SidebarHeader />
+          <SidebarContent onNavigate={onClose} />
+          <div className="mt-auto border-t border-Border py-5 text-xs leading-6 text-textSecondary">Nebula<br />مدیریت فروشگاه، در یک نگاه</div>
+        </div>
+      </aside>
+    </>
   );
 }
 

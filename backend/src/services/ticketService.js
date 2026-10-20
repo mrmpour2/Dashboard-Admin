@@ -5,17 +5,18 @@ const assigneeSelect = {
   select: { id: true, name: true, avatarUrl: true },
 };
 
-export async function listTickets({ page, pageSize, status, priority }) {
+export async function listTickets({ page, pageSize, status, priority, search, sortBy = "createdAt", sortOrder = "desc" }) {
   const where = {
     ...(status && { status }),
     ...(priority && { priority }),
+    ...(search && { OR: [{ title: { contains: search, mode: "insensitive" } }, { description: { contains: search, mode: "insensitive" } }] }),
   };
 
   const [items, total] = await Promise.all([
     prisma.ticket.findMany({
       where,
       include: { assignee: assigneeSelect, _count: { select: { comments: true } } },
-      orderBy: { createdAt: "desc" },
+      orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

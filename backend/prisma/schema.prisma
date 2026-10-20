@@ -37,20 +37,23 @@ enum TicketPriority {
 }
 
 model User {
-  id           String    @id @default(cuid())
+  id           String     @id @default(cuid())
   name         String
-  email        String    @unique
+  email        String     @unique
   passwordHash String
-  role         Role      @default(STAFF)
+  authVersion  Int        @default(0)
+  role         Role       @default(STAFF)
   status       UserStatus @default(ACTIVE)
   avatarUrl    String?
   lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  tickets      Ticket[]  @relation("AssignedTickets")
-  comments     Comment[]
-  refreshTokens RefreshToken[]
+  tickets           Ticket[]           @relation("AssignedTickets")
+  comments          Comment[]
+  refreshTokens     RefreshToken[]
+  orders            Order[]
+  chatConversations ChatConversation[]
 
   @@index([email])
   @@map("users")
@@ -59,34 +62,153 @@ model User {
 // توکن‌های refresh به‌صورت هش‌شده ذخیره می‌شوند (نه متن خام)
 // تا در صورت نشت پایگاه‌داده هم قابل استفاده نباشند.
 model RefreshToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userAgent String?
   ipAddress String?
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@map("refresh_tokens")
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  price       Decimal  @db.Decimal(12, 2)
-  stock       Int      @default(0)
-  category    String?
-  imageUrl    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String           @id @default(cuid())
+  name           String
+  description    String?
+  price          Decimal          @db.Decimal(12, 2)
+  stock          Int              @default(0)
+  category       String?
+  imageUrl       String?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  variants       ProductVariant[]
+  orderItems     OrderItem[]
+  chatOrderItems ChatOrderItem[]
+  reviews        Review[]
+  // مخلفات پیشنهادی این محصول (مثل نوشیدنی و ساید) — از پنل مدیریت تنظیم می‌شود.
+  addOns         ProductAddOn[]   @relation("ProductAddOns")
+  // محصولاتی که این محصول مخلفات آن‌هاست.
+  addOnOf        ProductAddOn[]   @relation("AddOnOfProducts")
 
   @@index([category])
   @@map("products")
+}
+
+// مخلفات پیشنهادی یک محصول (نوشیدنی، سس، ساید).
+//
+// چرا جدول واسط و نه فیلد JSON؟ چون مخلفات خودشان «محصول» واقعی با قیمت و
+// موجودی‌اند و باید در همان مسیرهای پرداخت/کسر موجودی شرکت کنند؛ کلید خارجی
+// تضمین می‌کند محصول حذف‌شده در پیشنهادها نماند.
+//
+//   productId → محصول اصلی (مثلاً برگر)
+//   addOnId   → محصول پیشنهادی (مثلاً نوشابه)
+//
+// `sortOrder` ترتیب نمایش در پنل مشتری را تعیین می‌کند و `isActive` یعنی این
+// پیشنهاد موقتاً خاموش است (بدون حذف رکورد).
+model ProductAddOn {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation("ProductAddOns", fields: [productId], references: [id], onDelete: Cascade)
+  addOnId   String
+  addOn     Product  @relation("AddOnOfProducts", fields: [addOnId], references: [id], onDelete: Cascade)
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, addOnId])
+  @@index([productId, sortOrder])
+  @@index([addOnId])
+  @@map("product_addons")
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// نظر مشتریان؛ هم روی صفحهٔ محصول وب‌سایت دیده می‌شود و هم می‌تواند در بخش
+// «Table Talk» صفحهٔ اصلی بیاید.
+//
+// قواعد مهم:
+//   - نظر تازه با وضعیت PENDING ساخته می‌شود؛ فقط APPROVED به مسیرهای عمومی
+//     می‌رود تا محتوای نامناسب قبل از انتشار بررسی شود.
+//   - `featured` تنها با پنل مدیریت تغییر می‌کند و معنی‌اش «نمایش در Table Talk
+//     صفحهٔ اصلی» است؛ هر نظر منتشرشده به‌طور خودکار در صفحهٔ اصلی نمی‌آید.
+//   - متن دیتابیس فارسی است (هم‌سبک با `ProductVariant.label`/`labelEn`) و فیلد
+//     `*En` ترجمهٔ اختیاری انگلیسی است؛ اگر خالی باشد همان متن فارسی در سایت
+//     انگلیسی هم نشان داده می‌شود.
+//   - `orderVerified` فقط از تطبیق `orderNumber` با یک سفارش واقعی ست می‌شود،
+//     نه از ورودی کاربر.
+model Review {
+  id            String       @id @default(cuid())
+  productId     String?
+  product       Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  authorName    String
+  authorNameEn  String?
+  // شمارهٔ تماس مشتری (اختیاری). وب‌سایت آن را از فرم ثبت نظر یا از عضوِ واردشدهٔ
+  // باشگاه مشتریان پر می‌کند تا پنل مدیریت بتواند نظر را به یک مشتری واقعی نسبت
+  // دهد و در صورت نیاز پیگیری کند. این فیلد دادهٔ داخلی است و هرگز در پاسخ‌های
+  // عمومی (صفحهٔ محصول و Table Talk) بیرون نمی‌رود.
+  authorPhone   String?
+  // عضوی که این نظر را با نشست باشگاه ثبت کرده است؛ امتیاز نظر فقط پس از
+  // تأیید مدیر و فقط یک بار به همین عضو تعلق می‌گیرد.
+  clubMemberId  String?
+  clubMember    ClubMember?  @relation(fields: [clubMemberId], references: [id], onDelete: SetNull)
+  // امتیاز اختیاری: نظرهایی که مدیر بدون امتیاز ثبت می‌کند (مثل روایت‌های
+  // «Table Talk» که از قبل روی سایت بودند) نباید امتیاز ساختگی بگیرند.
+  rating        Int?
+  body          String       @db.Text
+  bodyEn        String?      @db.Text
+  // شمارهٔ سفارش اختیاری؛ فقط برای پرچم «خرید تأییدشده» استفاده می‌شود و در
+  // پاسخ‌های عمومی نمایش داده نمی‌شود.
+  orderNumber   String?
+  orderVerified Boolean      @default(false)
+  status        ReviewStatus @default(PENDING)
+  // «نمایش در Table Talk صفحهٔ اصلی» — فقط از پنل مدیریت قابل تغییر است.
+  featured      Boolean      @default(false)
+  featuredOrder Int          @default(0)
+  images        String[]     @default([])
+  replyBody     String?      @db.Text
+  replyAt       DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([productId, status, createdAt])
+  @@index([status, featured, featuredOrder])
+  @@map("reviews")
+}
+
+// سایز/بسته‌های یک محصول؛ مثل پیتزای تک‌نفره، دو نفره و شش‌نفره.
+// قیمت هر واریانت مستقل است و سفارش وب‌سایت همان قیمت واریانت انتخاب‌شده را
+// از دیتابیس می‌خواند (قیمت ارسالی مرورگر مرجع نیست).
+// موجودی عمداً روی واریانت تکرار نشده و همان `Product.stock` ملاک است تا
+// رزرو/آزادسازی موجودی در همه مسیرهای پرداخت یکسان بماند.
+model ProductVariant {
+  id             String          @id @default(cuid())
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // برچسب اصلی (فارسی) که در منوی سایت و پنل دیده می‌شود.
+  label          String
+  // برچسب انگلیسی اختیاری برای نسخه انگلیسی سایت.
+  labelEn        String?
+  price          Decimal         @db.Decimal(12, 2)
+  sortOrder      Int             @default(0)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  chatOrderItems ChatOrderItem[]
+
+  @@unique([productId, label])
+  @@index([productId, sortOrder])
+  @@map("product_variants")
 }
 
 model Ticket {
@@ -117,4 +239,309 @@ model Comment {
 
   @@index([ticketId])
   @@map("comments")
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+model Coupon {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  discountType   DiscountType @default(PERCENTAGE)
+  discountValue  Decimal      @db.Decimal(12, 2)
+  minOrderAmount Decimal?     @db.Decimal(12, 2)
+  maxUses        Int?
+  usedCount      Int          @default(0)
+  isActive       Boolean      @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  orders         Order[]
+
+  @@map("coupons")
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  customerId     String
+  customer       User        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  status         OrderStatus @default(PENDING)
+  subtotalAmount Decimal     @db.Decimal(12, 2)
+  discountAmount Decimal     @default(0) @db.Decimal(12, 2)
+  totalAmount    Decimal     @db.Decimal(12, 2)
+  couponId       String?
+  coupon         Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([status])
+  @@index([customerId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity  Int
+  unitPrice Decimal @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// --- باشگاه مشتریان ---------------------------------------------------------
+// موجودی امتیاز فقط در سرور نگه داشته می‌شود و هر تغییر یک ردیف دفتر امتیاز
+// دارد. کلید یکتای (memberId, source, sourceId) تضمین می‌کند یک سفارش/نظر/پاداش
+// دوباره امتیاز ندهد، حتی اگر درخواست چند بار ارسال شود.
+
+enum ClubTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum ClubPointType {
+  EARN
+  REDEEM
+  ADJUST
+}
+
+enum ClubPointSource {
+  ORDER
+  REVIEW
+  REWARD
+  ADJUSTMENT
+}
+
+enum ClubRedemptionStatus {
+  PENDING
+  FULFILLED
+  CANCELLED
+}
+
+model ClubMember {
+  id            String    @id @default(cuid())
+  // شمارهٔ تماس نرمال‌شده (ارقام لاتین، بدون جداکننده) — کلید یکتای عضو.
+  phone         String    @unique
+  name          String
+  // رمز عضویت فقط به‌صورت هش ذخیره می‌شود؛ متن خام هرگز در دیتابیس نمی‌ماند.
+  pinHash       String
+  // موجودی جاری؛ منبع حقیقت برای نمایش و بررسی استرداد.
+  pointsBalance Int       @default(0)
+  // افزایش این مقدار همهٔ کوکی‌های نشست عضو را باطل می‌کند.
+  tokenVersion  Int       @default(0)
+  joinedAt      DateTime  @default(now())
+  lastLoginAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  transactions ClubPointTransaction[]
+  redemptions  ClubRedemption[]
+  reviews      Review[]
+
+  @@map("club_members")
+}
+
+model ClubPointTransaction {
+  id           String          @id @default(cuid())
+  memberId     String
+  member       ClubMember      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type         ClubPointType
+  source       ClubPointSource
+  // شناسهٔ سفارش/نظر/استرداد؛ همراه با memberId و source یکتاست.
+  sourceId     String
+  // مقدار علامت‌دار: مثبت برای کسب، منفی برای مصرف.
+  points       Int
+  balanceAfter Int
+  description  String?
+  createdAt    DateTime        @default(now())
+
+  @@unique([memberId, source, sourceId])
+  @@index([memberId, createdAt])
+  @@map("club_point_transactions")
+}
+
+model ClubReward {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  titleFa       String
+  titleEn       String
+  descriptionFa String?
+  descriptionEn String?
+  costPoints    Int
+  minTier       ClubTier  @default(BRONZE)
+  // `null` یعنی موجودی نامحدود؛ عدد یعنی تعداد قابل دریافت باقی‌مانده.
+  stock         Int?
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  redemptions ClubRedemption[]
+
+  @@index([isActive, sortOrder])
+  @@map("club_rewards")
+}
+
+model ClubRedemption {
+  id             String               @id @default(cuid())
+  memberId       String
+  member         ClubMember           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  rewardId       String
+  reward         ClubReward           @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  // کد یکتای دریافت که مشتری در رستوران نشان می‌دهد.
+  code           String               @unique
+  pointsSpent    Int
+  status         ClubRedemptionStatus @default(PENDING)
+  // کلید ساخته‌شده در مرورگر؛ ارسال دوبارهٔ همان درخواست رکورد تازه نمی‌سازد.
+  idempotencyKey String
+  createdAt      DateTime             @default(now())
+  fulfilledAt    DateTime?
+
+  @@unique([memberId, idempotencyKey])
+  @@index([memberId, createdAt])
+  @@map("club_redemptions")
+}
+
+// نشست‌های چت عمومی؛ sessionId باید یک مقدار تصادفی و غیرقابل حدس باشد.
+model ChatConversation {
+  id        String        @id @default(cuid())
+  sessionId String        @unique
+  userId    String?
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages  ChatMessage[]
+  orders    ChatOrder[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([createdAt])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           ChatMessageRole
+  content        String           @db.Text
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("chat_messages")
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum ChatOrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model ChatOrder {
+  id              String            @id @default(cuid())
+  orderNumber     String            @unique
+  conversationId  String?
+  conversation    ChatConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  shippingAddress String            @db.Text
+  status          ChatOrderStatus   @default(PENDING_PAYMENT)
+  subtotalAmount  Decimal           @db.Decimal(12, 2)
+  totalAmount     Decimal           @db.Decimal(12, 2)
+  items           ChatOrderItem[]
+  payments        ChatPayment[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([customerPhone])
+  @@map("chat_orders")
+}
+
+model ChatOrderItem {
+  id           String          @id @default(cuid())
+  orderId      String
+  order        ChatOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  // سایز انتخاب‌شده؛ `null` یعنی محصول واریانت ندارد (تک‌قیمت است).
+  variantId    String?
+  variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  // برچسب سایز در لحظه ثبت سفارش؛ حتی اگر واریانت بعداً تغییر کند فاکتور
+  // دست‌نخورده می‌ماند. قیمت هم در `unitPrice` قفل می‌شود.
+  variantLabel String?
+  // ردیف «مخلفات» به ردیف غذای اصلی همان سفارش وصل می‌شود؛ `null` یعنی این
+  // ردیف خودش یک قلم مستقل است. سرور این پیوند را فقط وقتی می‌پذیرد که محصول
+  // مخلفات برای همان غذای اصلی در پنل تعریف شده باشد.
+  parentItemId String?
+  parentItem   ChatOrderItem?  @relation("OrderItemAddOns", fields: [parentItemId], references: [id], onDelete: Cascade)
+  addOnItems   ChatOrderItem[] @relation("OrderItemAddOns")
+  quantity     Int
+  unitPrice    Decimal         @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@index([variantId])
+  @@index([parentItemId])
+  @@map("chat_order_items")
+}
+
+enum ChatPaymentMethod {
+  ZIBAL
+  CARD_TO_CARD
+}
+
+enum ChatPaymentStatus {
+  INITIATED
+  PENDING
+  PAID
+  FAILED
+  PENDING_REVIEW
+  REJECTED
+}
+
+model ChatPayment {
+  id                String            @id @default(cuid())
+  orderId           String
+  order             ChatOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  method            ChatPaymentMethod
+  status            ChatPaymentStatus @default(INITIATED)
+  amountToman       Decimal           @db.Decimal(12, 2)
+  amountRial        BigInt?
+  zibalTrackId      String?           @unique
+  zibalRefNumber    String?
+  receiptPath       String?
+  transferReference String?
+  adminNote         String?           @db.Text
+  reviewedById      String?
+  reviewedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([orderId, status])
+  @@index([method, status, createdAt])
+  @@map("chat_payments")
 }

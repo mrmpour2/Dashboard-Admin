@@ -6,17 +6,20 @@ function DropdownContent({
   children,
   className = "",
   align = "start",
-  side = "botton",
+  side = "bottom",
+  role = "menu",
   ...props
 }) {
   const { open } = useDropdown();
   if (!open) return null;
+
   return (
     <div
+      role={role}
       className={clsx(
-        `absolute flex flex-col mt-1  overflow-y-auto bg-Surface rounded-xl shadow-lg border border-Border  z-50`,
-        alignVariants[align],
-        sideVariants[side],
+        "absolute z-50 mt-2 flex max-h-96 min-w-48 flex-col overflow-y-auto overflow-x-hidden rounded-xl border border-Border bg-Surface shadow-Dropdown",
+        alignVariants[align] ?? alignVariants.start,
+        sideVariants[side] ?? sideVariants.bottom,
         className,
       )}
       {...props}

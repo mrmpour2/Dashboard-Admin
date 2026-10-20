@@ -7,12 +7,12 @@ function SidebarHeader() {
       <Logo />
       <Link
         to="/"
-        className="flex flex-col leading-tight text-white transition-opacity hover:opacity-90"
+        className="flex flex-col leading-tight text-textPrimary transition-opacity hover:opacity-90"
       >
         <span className="text-lg font-bold tracking-wide font-Outfit">
           Nebula
         </span>
-        <span className="text-xs text-white/60">پنل مدیریت</span>
+        <span className="mt-1 text-xs text-textSecondary">مدیریت فروشگاه</span>
       </Link>
     </div>
   );

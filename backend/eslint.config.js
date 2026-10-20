@@ -10,6 +10,11 @@ export default [
         process: "readonly",
         console: "readonly",
         setTimeout: "readonly",
+        // سرور Node است و از APIهای وب (fetch/AbortSignal) هم استفاده می‌کند؛
+        // بدون این‌ها `no-undef` روی کد موجود خطای الکی می‌داد.
+        Buffer: "readonly",
+        fetch: "readonly",
+        AbortSignal: "readonly",
       },
     },
     rules: {

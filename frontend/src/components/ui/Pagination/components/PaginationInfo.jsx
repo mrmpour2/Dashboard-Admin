@@ -8,7 +8,7 @@ function PaginationInfo() {
 
   return (
     <span className="text-sm text-textMuted">
-      Showing {start}-{end} of {totalItems}
+      نمایش {start.toLocaleString("fa-IR")} تا {end.toLocaleString("fa-IR")} از {totalItems.toLocaleString("fa-IR")} مورد
     </span>
   );
 }

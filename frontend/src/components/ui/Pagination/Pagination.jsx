@@ -4,53 +4,42 @@ import PaginationNext from "./components/PaginationNext";
 import PaginationPages from "./components/PaginationPages";
 import PaginationInfo from "./components/PaginationInfo";
 
-/**
- * Controlled pagination: the consumer owns `currentPage` state and is
- * responsible for slicing their own data with it (same reason Table.Body
- * takes `data` — the state needs to reach code that lives outside this tree).
- *
- * <Pagination
- *   currentPage={page}
- *   totalItems={products.length}
- *   pageSize={10}
- *   onPageChange={setPage}
- * >
- *   <Pagination.Info />
- *   <Pagination.Prev />
- *   <Pagination.Pages />
- *   <Pagination.Next />
- * </Pagination>
- */
-function Pagination({
-  children,
-  currentPage,
-  totalItems,
-  pageSize,
-  onPageChange,
+const Pagination = ({
+  currentPage = 1,
+  totalItems = 0,
+  pageSize = 10,
+  onPageChange = () => {},
   siblingCount = 1,
-}) {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  children,
+  className = "",
+}) => {
+  const safePageSize = Math.max(1, Number(pageSize) || 1);
+  const safeTotalItems = Math.max(0, Number(totalItems) || 0);
+  const safeSiblingCount = Math.max(0, Number(siblingCount) || 0);
+
+  const totalPages = Math.max(1, Math.ceil(safeTotalItems / safePageSize));
+  const safeCurrentPage = Math.min(Math.max(1, Number(currentPage) || 1), totalPages);
 
   const value = {
-    currentPage,
+    currentPage: safeCurrentPage,
     totalPages,
-    totalItems,
-    pageSize,
+    totalItems: safeTotalItems,
+    pageSize: safePageSize,
+    siblingCount: safeSiblingCount,
     onPageChange,
-    siblingCount,
   };
 
   return (
     <PaginationContext.Provider value={value}>
       <nav
-        className="flex flex-wrap items-center justify-between gap-3"
-        aria-label="Pagination"
+        aria-label="صفحه‌بندی"
+        className={`flex flex-wrap items-center justify-between gap-3 ${className}`}
       >
         {children}
       </nav>
     </PaginationContext.Provider>
   );
-}
+};
 
 Pagination.Prev = PaginationPrev;
 Pagination.Next = PaginationNext;

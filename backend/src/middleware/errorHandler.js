@@ -5,7 +5,7 @@ import { isProd } from "../config/env.js";
 // هدف: کاربر پیام قابل‌فهم و امن ببیند، ولی جزئیات فنی (stack trace، اسکیمای دیتابیس، و...)
 // هرگز به بیرون نشت نکند — این جزئیات فقط در لاگ سرور ثبت می‌شوند.
 export function errorHandler(err, req, res, _next) {
-  const statusCode = err.isOperational ? err.statusCode : 500;
+  const statusCode = err.code === "P2034" ? 409 : err.isOperational ? err.statusCode : 500;
   const code = err.code || "INTERNAL_ERROR";
 
   if (statusCode >= 500) {
@@ -15,7 +15,7 @@ export function errorHandler(err, req, res, _next) {
   }
 
   const message =
-    err.isOperational || !isProd ? err.message : "خطایی در سرور رخ داد.";
+    err.code === "P2034" ? "داده‌ها هم‌زمان تغییر کرده‌اند. دوباره تلاش کنید." : err.isOperational || !isProd ? err.message : "خطایی در سرور رخ داد.";
 
   res.status(statusCode).json({
     message,

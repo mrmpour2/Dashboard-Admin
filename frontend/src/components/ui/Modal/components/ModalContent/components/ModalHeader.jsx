@@ -1,9 +1,10 @@
 import clsx from "clsx";
-import CloseBoutton from "./CloseButton";
+import CloseButton from "./CloseButton";
 import useModal from "../../../context/useModal";
 
 function ModalHeader({ children, className = "", ...props }) {
   const { setOpen } = useModal();
+
   return (
     <div
       className={clsx(
@@ -13,7 +14,7 @@ function ModalHeader({ children, className = "", ...props }) {
       {...props}
     >
       {children}
-      <CloseBoutton onClick={() => setOpen(false)} />
+      <CloseButton onClick={() => setOpen(false)} />
     </div>
   );
 }

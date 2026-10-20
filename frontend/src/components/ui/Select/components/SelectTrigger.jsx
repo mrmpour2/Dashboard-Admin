@@ -10,10 +10,11 @@ function SelectTrigger({
   className = "",
   ...props
 }) {
-  const { toggle } = useSelect();
+  const { toggle, open } = useSelect();
   return (
     <button
       aria-haspopup="listbox"
+      aria-expanded={open}
       type="button"
       disabled={disabled}
       onClick={!disabled ? toggle : undefined}

@@ -9,12 +9,17 @@ function TitlePage() {
     "/users": "کاربران",
     "/comments": "نظرات",
     "/tickets": "تیکت‌ها",
+    "/orders": "سفارش‌ها",
+    "/coupons": "کدهای تخفیف",
+    "/profile": "پروفایل",
+    "/settings": "تنظیمات",
+    "/security": "امنیت",
   };
 
   const title = titles[location.pathname] || "داشبورد";
 
   return (
-    <h2 className="flex w-20 font-bold font-Vazir text-3xl text-textColor">
+    <h2 className="whitespace-nowrap font-Vazir text-base font-bold text-textPrimary sm:text-lg">
       {title}
     </h2>
   );

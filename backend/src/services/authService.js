@@ -11,8 +11,9 @@ import { env } from "../config/env.js";
 
 function publicUser(user) {
   // هرگز passwordHash یا فیلدهای داخلی را برنمی‌گردانیم
-  const { passwordHash, ...safe } = user;
+  const { passwordHash, authVersion, ...safe } = user;
   void passwordHash;
+  void authVersion;
   return safe;
 }
 
@@ -92,29 +93,30 @@ export async function refresh(refreshTokenFromCookie) {
     throw new UnauthorizedError("نشست شما منقضی شده است، دوباره وارد شوید");
   }
 
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-  if (!user || user.status !== "ACTIVE") {
-    throw new UnauthorizedError("حساب کاربری در دسترس نیست");
-  }
-
-  // چرخش توکن (rotation): توکن قدیمی باطل و یک توکن جدید صادر می‌شود.
-  // این کار در صورت سرقت یک refresh token قدیمی، امکان سوءاستفاده مجدد را از بین می‌برد.
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date() },
+  return prisma.$transaction(async (tx) => {
+    // Lock the account before its tokens, matching password-change lock order.
+    const account = await tx.user.updateMany({
+      where: { id: payload.sub, status: "ACTIVE", authVersion: payload.version || 0 },
+      data: { authVersion: { increment: 0 } },
+    });
+    if (account.count !== 1 || stored.userId !== payload.sub) {
+      throw new UnauthorizedError("حساب کاربری در دسترس نیست");
+    }
+    const consumed = await tx.refreshToken.updateMany({
+      where: { id: stored.id, userId: payload.sub, revokedAt: null, expiresAt: { gt: new Date() } },
+      data: { revokedAt: new Date() },
+    });
+    if (consumed.count !== 1) {
+      throw new UnauthorizedError("نشست شما منقضی شده است، دوباره وارد شوید");
+    }
+    const user = await tx.user.findUnique({ where: { id: payload.sub } });
+    const newRefreshToken = signRefreshToken(user);
+    await tx.refreshToken.create({
+      data: { tokenHash: hashToken(newRefreshToken), userId: user.id,
+        expiresAt: new Date(Date.now() + refreshTtlMs()) },
+    });
+    return { accessToken: signAccessToken(user), refreshToken: newRefreshToken, user: publicUser(user) };
   });
-
-  const newRefreshToken = signRefreshToken(user);
-  await prisma.refreshToken.create({
-    data: {
-      tokenHash: hashToken(newRefreshToken),
-      userId: user.id,
-      expiresAt: new Date(Date.now() + refreshTtlMs()),
-    },
-  });
-
-  const accessToken = signAccessToken(user);
-  return { accessToken, refreshToken: newRefreshToken, user: publicUser(user) };
 }
 
 export async function logout(refreshTokenFromCookie) {

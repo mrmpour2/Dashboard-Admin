@@ -1,9 +1,9 @@
 import pino from "pino";
-import { isProd } from "./env.js";
+import { env, isProd } from "./env.js";
 
 // در توسعه، خروجی خوانا و رنگی؛ در production، JSON ساختاریافته برای ابزارهای مانیتورینگ
 export const logger = pino({
-  level: isProd ? "info" : "debug",
+  level: env.NODE_ENV === "test" ? "silent" : isProd ? "info" : "debug",
   transport: isProd
     ? undefined
     : {

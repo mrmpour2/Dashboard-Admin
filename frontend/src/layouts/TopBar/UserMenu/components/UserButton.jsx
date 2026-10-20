@@ -20,7 +20,7 @@ function UserButton({ user }) {
       "
     >
       <div className="relative">
-        <Avatar src={user.avatar} size="md" username={user.username} />
+        <Avatar src={user.avatar} name={user.name} size="sm" />
 
         {/* Online Badge */}
         <span
@@ -42,12 +42,12 @@ function UserButton({ user }) {
       </div>
 
       {/* User Info */}
-      <div className="flex flex-col items-start leading-tight">
+      <div className="hidden xl:flex flex-col items-start leading-tight">
         <span
           className="
             text-sm
             font-bold
-            text-textColor
+            text-textPrimary
           "
         >
           {user.name}
@@ -61,7 +61,7 @@ function UserButton({ user }) {
             gap-1
 
             text-xs
-            text-textColor/60
+            text-textSecondary
           "
         >
           <ShieldCheck size={13} />
@@ -73,12 +73,12 @@ function UserButton({ user }) {
       <ChevronDown
         size={18}
         className="
-          text-textColor/60
+          text-textSecondary
 
           transition-transform
           duration-300
 
-          group-hover:text-white
+          group-hover:text-primary
         "
       />
     </div>

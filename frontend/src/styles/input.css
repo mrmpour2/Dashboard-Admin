@@ -6,7 +6,7 @@
 @layer base {
     @font-face {
         font-family: "Vazir";
-        src: url("/fonts/Vazirmatn-Regular.ttf") format("truetype");
+        src: url("/fonts/Vazirmatn-Regular.woff2") format("woff2");
         font-weight: 400;
         font-style: normal;
         font-display: swap;
@@ -14,7 +14,7 @@
 
     @font-face {
         font-family: "Vazir";
-        src: url("/fonts/Vazirmatn-Medium.ttf") format("truetype");
+        src: url("/fonts/Vazirmatn-Medium.woff2") format("woff2");
         font-weight: 500;
         font-style: normal;
         font-display: swap;
@@ -22,7 +22,7 @@
 
     @font-face {
         font-family: "Vazir";
-        src: url("/fonts/Vazirmatn-SemiBold.ttf") format("truetype");
+        src: url("/fonts/Vazirmatn-SemiBold.woff2") format("woff2");
         font-weight: 600;
         font-style: normal;
         font-display: swap;
@@ -30,7 +30,7 @@
 
     @font-face {
         font-family: "Vazir";
-        src: url("/fonts/Vazirmatn-Bold.ttf") format("truetype");
+        src: url("/fonts/Vazirmatn-Bold.woff2") format("woff2");
         font-weight: 700;
         font-style: normal;
         font-display: swap;
@@ -38,7 +38,7 @@
 
     @font-face {
         font-family: "Outfit";
-        src: url("/fonts/Outfit-Bold.ttf") format("truetype");
+        src: url("/fonts/Outfit-Bold.woff2") format("woff2");
         font-weight: 700;
         font-style: normal;
         font-display: swap;
@@ -50,26 +50,26 @@
     --font-Outfit: "Outfit", sans-serif;
 
     /* ===== پالت «نبولا» (Nebula) — بنفش الکتریک × فیروزه‌ای ===== */
-    --color-primary: #5B3FE8;
-    --color-primary-50: #F1EEFE;
-    --color-primary-100: #E4DDFD;
-    --color-primary-600: #4A30D6;
-    --color-primary-700: #3B23B0;
+    --color-primary: #2455C7;
+    --color-primary-50: #EEF3FF;
+    --color-primary-100: #DCE7FF;
+    --color-primary-600: #1D46A5;
+    --color-primary-700: #173783;
 
-    --color-secondary: #14B8A6;
+    --color-secondary: #12806A;
     --color-secondary-100: #CCFBF3;
     --color-secondary-600: #0E9A8B;
 
     --color-accent: #F59E0B;
 
-    --color-Background: #F6F7FB;
+    --color-Background: #F2F5FA;
     --color-Surface: #FFFFFF;
     --color-SurfaceMuted: #EEF0F7;
     --color-Border: #E4E7F0;
 
-    --color-textPrimary: #0B1130;
-    --color-textSecondary: #64748B;
-    --color-textMuted: #94A3B8;
+    --color-textPrimary: #18314F;
+    --color-textSecondary: #56677D;
+    --color-textMuted: #62738A;
 
     --color-profit: #16A34A;
     --color-loos: #F43F5E;
@@ -80,8 +80,8 @@
     --color-Info: #3B82F6;
 
     /* گرادینت‌های برند */
-    --color-gradient-from: #5B3FE8;
-    --color-gradient-to: #14B8A6;
+    --color-gradient-from: #2455C7;
+    --color-gradient-to: #12806A;
 
     /* radius  */
     --radius-Button: 0.75rem;
@@ -121,7 +121,7 @@
 
     --color-textPrimary: #F1F3FA;
     --color-textSecondary: #A3ABC2;
-    --color-textMuted: #6B7390;
+    --color-textMuted: #A0ABC3;
 
     --color-profit: #34D399;
     --color-loos: #FB7185;
@@ -138,6 +138,8 @@
     --shadow-Card: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.3);
     --shadow-Modal: 0 25px 50px -12px rgb(0 0 0 / 0.6);
     --shadow-Glow: 0 8px 30px -8px rgb(139 123 255 / 0.45);
+
+
 }
 
 @layer utilities {
@@ -166,50 +168,119 @@
 /* ===== انیمیشن‌های نرم و مدرن ===== */
 @layer utilities {
     @keyframes fade-in {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
     }
 
     @keyframes fade-in-up {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     @keyframes scale-in {
-        from { opacity: 0; transform: scale(0.96); }
-        to { opacity: 1; transform: scale(1); }
+        from {
+            opacity: 0;
+            transform: scale(0.96);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
     }
 
     @keyframes shimmer {
-        from { background-position: -200% 0; }
-        to { background-position: 200% 0; }
+        from {
+            background-position: -200% 0;
+        }
+
+        to {
+            background-position: 200% 0;
+        }
     }
 
     @keyframes float-soft {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-6px); }
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-6px);
+        }
     }
 
     @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 45%, transparent); }
-        50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-primary) 0%, transparent); }
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 45%, transparent);
+        }
+
+        50% {
+            box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-primary) 0%, transparent);
+        }
     }
 
-    .animate-fade-in { animation: fade-in 0.4s var(--ease-smooth) both; }
-    .animate-fade-in-up { animation: fade-in-up 0.45s var(--ease-smooth) both; }
-    .animate-scale-in { animation: scale-in 0.3s var(--ease-spring) both; }
-    .animate-float-soft { animation: float-soft 4s ease-in-out infinite; }
-    .animate-pulse-glow { animation: pulse-glow 2.2s ease-in-out infinite; }
+    .animate-fade-in {
+        animation: fade-in 0.4s var(--ease-smooth) both;
+    }
 
-    .animate-stagger-1 { animation-delay: 60ms; }
-    .animate-stagger-2 { animation-delay: 120ms; }
-    .animate-stagger-3 { animation-delay: 180ms; }
-    .animate-stagger-4 { animation-delay: 240ms; }
-    .animate-stagger-5 { animation-delay: 300ms; }
+    .animate-fade-in-up {
+        animation: fade-in-up 0.45s var(--ease-smooth) both;
+    }
+
+    .animate-scale-in {
+        animation: scale-in 0.3s var(--ease-spring) both;
+    }
+
+    .animate-float-soft {
+        animation: float-soft 4s ease-in-out infinite;
+    }
+
+    .animate-pulse-glow {
+        animation: pulse-glow 2.2s ease-in-out infinite;
+    }
+
+    .animate-stagger-1 {
+        animation-delay: 60ms;
+    }
+
+    .animate-stagger-2 {
+        animation-delay: 120ms;
+    }
+
+    .animate-stagger-3 {
+        animation-delay: 180ms;
+    }
+
+    .animate-stagger-4 {
+        animation-delay: 240ms;
+    }
+
+    .animate-stagger-5 {
+        animation-delay: 300ms;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+
+    *,
+    *::before,
+    *::after {
         animation-duration: 0.001ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.001ms !important;
@@ -219,4 +290,24 @@
 body {
     background-color: var(--color-Background);
     color: var(--color-textPrimary);
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-Vazir);
+    line-height: 1.6;
+}
+
+:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+::selection {
+    background: var(--color-primary-100);
+    color: var(--color-textPrimary);
+}
+
+.operation-banner {
+    border-inline-start-width: 4px;
 }

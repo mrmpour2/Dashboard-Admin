@@ -1,103 +1,25 @@
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
-import { Card } from "../../../components/ui";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import Card from "../../../components/ui/Card/Card";
 
-const weeklyData = [
-  { day: "شنبه", فروش: 4200, بازدید: 2400 },
-  { day: "یکشنبه", فروش: 3100, بازدید: 1980 },
-  { day: "دوشنبه", فروش: 5400, بازدید: 3200 },
-  { day: "سه‌شنبه", فروش: 4800, بازدید: 2780 },
-  { day: "چهارشنبه", فروش: 6100, بازدید: 3908 },
-  { day: "پنجشنبه", فروش: 7300, بازدید: 4300 },
-  { day: "جمعه", فروش: 6900, بازدید: 4100 },
-];
-
-function CustomTooltip({ active, payload, label }) {
+const number = new Intl.NumberFormat("fa-IR");
+const day = new Intl.DateTimeFormat("fa-IR", { weekday: "short", timeZone: "UTC" });
+function RevenueTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-xl border border-Border bg-Surface px-3.5 py-2.5 shadow-Dropdown">
-      <p className="mb-1 text-xs font-medium text-textMuted">{label}</p>
-      {payload.map((entry) => (
-        <p
-          key={entry.dataKey}
-          className="text-sm font-bold"
-          style={{ color: entry.color }}
-        >
-          {entry.dataKey}: {entry.value.toLocaleString("fa-IR")}
-        </p>
-      ))}
+  return <div dir="rtl" className="rounded-lg border border-Border bg-Surface p-3 text-sm shadow-Dropdown"><p className="text-textSecondary">{label}</p><p className="mt-1 font-bold text-primary">{number.format(payload[0].value)} تومان</p></div>;
+}
+export default function RevenueChart({ data }) {
+  const chartData = data.map((item) => ({ ...item, day: day.format(new Date(item.date)) }));
+  return <Card className="min-w-0 p-5 text-start">
+    <h2 className="font-bold text-textPrimary">فروش در هفت روز گذشته</h2><p className="mt-1 text-xs text-textSecondary">مبلغ سفارش‌های ثبت‌شده، بدون سفارش‌های لغوشده</p>
+    <div className="mt-6 h-64 w-full min-w-0" dir="ltr" role="img" aria-label="نمودار مبلغ فروش در هفت روز گذشته">
+      <ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <CartesianGrid stroke="var(--color-Border)" vertical={false} strokeDasharray="4 4" />
+        <XAxis dataKey="day" fontSize={11} tickLine={false} axisLine={false} stroke="var(--color-textSecondary)" />
+        <YAxis width={58} fontSize={11} tickLine={false} axisLine={false} stroke="var(--color-textSecondary)" tickFormatter={(value) => number.format(value / 1000000) + "م"} />
+        <Tooltip content={<RevenueTooltip />} />
+        <Area type="monotone" dataKey="revenue" name="فروش" stroke="var(--color-primary)" strokeWidth={2.5} fill="var(--color-primary-100)" isAnimationActive={false} />
+      </AreaChart></ResponsiveContainer>
     </div>
-  );
+    <details className="mt-3 text-xs text-textSecondary"><summary className="cursor-pointer">نمایش ارقام روزانه</summary><ul className="mt-3 grid gap-2 sm:grid-cols-2">{chartData.map((item) => <li key={item.date}>{item.day}: {number.format(item.revenue)} تومان</li>)}</ul></details>
+  </Card>;
 }
-
-function RevenueChart() {
-  return (
-    <Card className="animate-fade-in-up p-5 text-right" style={{ animationDelay: "260ms" }}>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-textPrimary">روند فروش هفته اخیر</h3>
-          <p className="text-xs text-textMuted">مقایسه فروش و بازدید روزانه</p>
-        </div>
-      </div>
-
-      <div className="h-72 w-full" dir="ltr">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-            <defs>
-              <linearGradient id="colorSale" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.35} />
-                <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="colorVisit" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-secondary)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-secondary)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="4 4" stroke="var(--color-Border)" vertical={false} />
-            <XAxis
-              dataKey="day"
-              stroke="var(--color-textMuted)"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="var(--color-textMuted)"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-              width={46}
-              tickFormatter={(value) =>
-                value >= 1000 ? `${value / 1000}k` : value
-              }
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="فروش"
-              stroke="var(--color-primary)"
-              strokeWidth={2.5}
-              fill="url(#colorSale)"
-            />
-            <Area
-              type="monotone"
-              dataKey="بازدید"
-              stroke="var(--color-secondary)"
-              strokeWidth={2.5}
-              fill="url(#colorVisit)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </Card>
-  );
-}
-
-export default RevenueChart;

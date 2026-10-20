@@ -11,6 +11,9 @@ export const listTicketsSchema = z.object({
     pageSize: z.coerce.number().int().min(1).max(100).default(10),
     status: statusEnum.optional(),
     priority: priorityEnum.optional(),
+    search: z.string().trim().max(100).optional(),
+    sortBy: z.enum(["createdAt", "title", "priority", "status"]).default("createdAt"),
+    sortOrder: z.enum(["asc", "desc"]).default("desc"),
   }),
 });
 

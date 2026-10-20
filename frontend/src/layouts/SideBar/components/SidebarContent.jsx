@@ -1,10 +1,17 @@
 import { NavLink } from "react-router";
 import { sidebarItems } from "./sidebarItems";
+import { useAuth } from "../../../auth/useAuth";
 
-function SidebarContent() {
+function SidebarContent({ onNavigate }) {
+  const { user } = useAuth();
+  const visibleItems = sidebarItems.filter((item) => !item.roles || item.roles.includes(user?.role));
+
   return (
-    <nav className="flex flex-col gap-y-1.5 py-2 font-Vazir font-medium">
-      {sidebarItems.map((item, index) => {
+    <nav
+      aria-label="ناوبری اصلی"
+      className="flex flex-col gap-y-1.5 py-2 font-Vazir font-medium"
+    >
+      {visibleItems.map((item) => {
         const Icon = item.icon;
 
         return (
@@ -12,19 +19,17 @@ function SidebarContent() {
             key={item.path}
             to={item.path}
             end={item.path === "/"}
-            style={{ animationDelay: `${index * 60}ms` }}
+            onClick={onNavigate}
+
             className={({ isActive }) =>
-              `animate-fade-in-up group relative flex items-center gap-x-4 rounded-xl px-4 py-2.5 text-[15px] transition-all duration-300 ease-out ${
+              `group relative flex items-center gap-x-3 rounded-lg px-4 py-3 text-sm transition-colors ${
                 isActive
-                  ? "bg-white text-primary shadow-lg"
-                  : "text-white/75 hover:bg-white/10 hover:text-white"
+                  ? "bg-primary-50 text-primary font-bold"
+                  : "text-textSecondary hover:bg-SurfaceMuted hover:text-textPrimary"
               }`
             }
           >
-            <Icon
-              size={19}
-              className="shrink-0 transition-transform duration-300 group-hover:scale-110"
-            />
+            <Icon aria-hidden="true" size={19} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
             <span>{item.title}</span>
           </NavLink>
         );

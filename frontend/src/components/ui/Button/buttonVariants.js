@@ -6,7 +6,7 @@ const base =
   "inline-flex items-center justify-center text-center align-middle text-sm font-bold leading-4.5 tracking-wide border transition-all duration-300 ease-out active:scale-[0.97]";
 
 export const buttonVariants = {
-  primary: `${base} border-transparent text-white bg-gradient-brand shadow-Glow hover:brightness-110 hover:-translate-y-0.5 active:brightness-95`,
+  primary: `${base} border-transparent text-white bg-primary hover:bg-primary-600 active:brightness-95`,
 
   secondary: `${base} border-Border bg-Surface text-textPrimary hover:border-primary/50 hover:text-primary hover:bg-primary-50`,
 

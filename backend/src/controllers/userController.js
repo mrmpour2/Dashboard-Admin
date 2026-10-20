@@ -1,6 +1,20 @@
 import * as userService from "../services/userService.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
+export const updateProfile = asyncHandler(async (req, res) => {
+  res.json({ user: await userService.updateUser(req.user.id, req.body, req.user) });
+});
+
+export const changePassword = asyncHandler(async (req, res) => {
+  await userService.changePassword(req.user.id, req.body);
+  res.status(204).send();
+});
+
+export const createUser = asyncHandler(async (req, res) => {
+  const user = await userService.createUser(req.body);
+  res.status(201).json({ user });
+});
+
 export const listUsers = asyncHandler(async (req, res) => {
   const result = await userService.listUsers(req.query);
   res.json(result);
