@@ -48,6 +48,7 @@ const envSchema = z.object({
   CARD_TO_CARD_OWNER: z.string().trim().default(""),
   CARD_TO_CARD_BANK: z.string().trim().default(""),
   SECURITY_PROVIDER_MODE: z.enum(["disabled", "mock"]).default("disabled"),
+  TURNSTILE_SECRET_KEY: z.string().trim().default(""),
   OTP_HASH_SECRET: z.string().default(""),
   OTP_DAILY_PHONE_LIMIT: z.coerce.number().int().min(1).default(10),
   OTP_DAILY_IP_LIMIT: z.coerce.number().int().min(1).default(50),
