@@ -1,0 +1,67 @@
+{
+  "timestamp": "2026-10-20T16:22:00.967Z",
+  "environment": "Disposable loopback PostgreSQL; SMS/refund mocks; no AI calls",
+  "independentVerification": false,
+  "tests": [
+    {
+      "name": "backfill dry-run preserves data, apply reconstructs legacy on_hand and rerun is idempotent",
+      "passed": true
+    },
+    {
+      "name": "unpaid hold preserves on_hand and expiry restores availability",
+      "passed": true
+    },
+    {
+      "name": "true concurrent race for last unit admits one order",
+      "passed": true
+    },
+    {
+      "name": "same idempotency key returns one order and rejects changed payload",
+      "passed": true
+    },
+    {
+      "name": "duplicate verified callbacks consume once",
+      "passed": true
+    },
+    {
+      "name": "late verified payment re-reserves available stock",
+      "passed": true
+    },
+    {
+      "name": "mismatched verified amount or order identity never consumes inventory",
+      "passed": true
+    },
+    {
+      "name": "late verified payment without stock creates one mock refund, notification and ticket",
+      "passed": true
+    },
+    {
+      "name": "late card receipt without stock is rejected with manual-review ticket",
+      "passed": true
+    },
+    {
+      "name": "cancellation releases rather than expires and is idempotent",
+      "passed": true
+    },
+    {
+      "name": "one active order per phone or IP and five reservations per hour",
+      "passed": true
+    },
+    {
+      "name": "two expiry workers release once; dry-run leaves stock untouched",
+      "passed": true
+    },
+    {
+      "name": "OTP is hashed, single-use, five-attempt locked and guest without proof is rejected",
+      "passed": true
+    },
+    {
+      "name": "database prevents negative stock and audit modification",
+      "passed": true
+    },
+    {
+      "name": "public product reads lazily expire stock and rollout fallback never uses permanent deductions",
+      "passed": true
+    }
+  ]
+}

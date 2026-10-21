@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-20T09:42:55.383Z",
+  "environment": "Disposable random fixture schema on loopback Docker PostgreSQL",
+  "SEC_005": {
+    "reproduced": true,
+    "unauthenticatedOrderStatus": 201,
+    "stockBefore": 2,
+    "stockAfter": 0,
+    "paymentAttempts": 0,
+    "nextCustomerStatus": 400,
+    "limitation": "No wall-clock expiry test; absence of an expiry column/worker is separately established by source inspection."
+  },
+  "SEC_006": {
+    "reproduced": true,
+    "unverifiedPhoneClaimStatus": 201,
+    "sessionIssued": true,
+    "secondClaimStatus": 409,
+    "pointsCreditedToFirstClaimant": 2,
+    "limitation": "PAID state is simulated inside the disposable fixture; no payment or SMS is sent."
+  }
+}
