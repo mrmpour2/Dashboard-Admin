@@ -10,6 +10,7 @@ import reviewRoutes from "./reviewRoutes.js";
 import publicRoutes from "./publicRoutes.js";
 import chatRoutes from "./chatRoutes.js";
 import paymentRoutes from "./paymentRoutes.js";
+import paypingRoutes from "./paypingRoutes.js";
 import conversationRoutes from "./conversationRoutes.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -37,5 +38,6 @@ router.use("/public", publicRoutes);
 router.use("/chat", chatRoutes);
 router.use("/conversations", conversationRoutes);
 router.use("/payment", paymentRoutes);
+router.use("/payment/payping", paypingRoutes);
 
 export default router;

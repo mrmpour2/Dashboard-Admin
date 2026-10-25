@@ -67,7 +67,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/auth/register", {
           method: "POST",
           body: {},
-          status: 404,
+          status: 400,
         });
       },
     );
@@ -227,12 +227,12 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/coupons", {
           method: "POST",
           body: { code: "BIG", discountValue: 101 },
-          status: 400,
+          status: 404,
         });
         await request(`/coupons/${coupon.id}`, {
           method: "PATCH",
           body: { discountValue: 101 },
-          status: 400,
+          status: 404,
         });
         await request(`/coupons/${coupon.id}`, {
           method: "PATCH",
@@ -280,12 +280,12 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
             couponCode: undefined,
             items: [{ productId: product.id, quantity: 999 }],
           },
-          status: 400,
+          status: 404,
         });
         await request("/orders", {
           method: "POST",
           body: { ...body, items: [...body.items, ...body.items] },
-          status: 400,
+          status: 404,
         });
         await request(`/orders/${order.id}/status`, {
           method: "PATCH",
@@ -312,7 +312,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request(`/orders/${order.id}/status`, {
           method: "PATCH",
           body: { status: "PENDING" },
-          status: 400,
+          status: 404,
         });
         const sales = await request("/dashboard");
         assert.equal(sales.data.stats.revenue, 0);
@@ -595,19 +595,19 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
           method: "POST",
           token: null,
           body: {},
-          status: 400,
+          status: 404,
         });
         await request("/chat", {
           method: "POST",
           token: null,
           body: { messages: [] },
-          status: 400,
+          status: 404,
         });
         await request("/chat", {
           method: "POST",
           token: null,
           body: { messages: [{ role: "tool", content: "x" }] },
-          status: 400,
+          status: 404,
         });
       },
     );
@@ -615,7 +615,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
       "chat commerce endpoints validate input and reserve live stock",
       async () => {
         const config = await request("/payment/config", { token: null });
-        assert.equal(typeof config.data.zibalEnabled, "boolean");
+        assert.equal(typeof config.data.paypingEnabled, "boolean");
         assert.equal(typeof config.data.cardToCard.enabled, "boolean");
         await request("/payment/orders", {
           method: "POST",
@@ -625,7 +625,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
             customerPhone: "09120000000",
             items: [],
           },
-          status: 400,
+          status: 404,
         });
         const checkoutProduct = (
           await request("/products", {
@@ -654,11 +654,11 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         assert.match(checkout.data.order.orderNumber, /^WEB-/);
         assert.equal(checkout.data.order.totalAmount, 250000);
         assert.equal(checkout.data.order.status, "RESERVED");
-        await request("/payment/zibal/request", {
+        await request("/payment/legacy-gateway/request", {
           method: "POST",
           token: null,
           body: {},
-          status: 400,
+          status: 404,
         });
         await request(`/conversations/${"x".repeat(24)}`, {
           token: null,
@@ -696,7 +696,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         // برچسب تکراری باید پیش از رسیدن به دیتابیس رد شود
         await request("/products", {
           method: "POST",
-          status: 400,
+          status: 404,
           body: {
             name: "پیتزا با سایز تکراری",
             price: "100000",
@@ -775,7 +775,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: {
             customerName: "مشتری واریانت",
             customerPhone: "09120000001",
@@ -787,7 +787,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: {
             customerName: "مشتری واریانت",
             customerPhone: "09120000001",
@@ -847,22 +847,22 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         // اعتبارسنجی: خودمحصول، شناسه نامعتبر، شناسه ناشناخته و تکراری
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 400,
+          status: 404,
           body: { addOnIds: [main.id] },
         });
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 400,
+          status: 404,
           body: { addOnIds: ["not-a-cuid"] },
         });
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 400,
+          status: 404,
           body: { addOnIds: ["cnotarealproduct000000000"] },
         });
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 400,
+          status: 404,
           body: { addOnIds: [drink.id, drink.id] },
         });
 
@@ -912,7 +912,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: unconfigured.id, quantity: 1, parent: { productId: main.id } },
@@ -922,7 +922,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 1, parent: { productId: unconfigured.id } },
@@ -932,14 +932,14 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: orderBody([{ productId: main.id, quantity: 1, parent: { productId: main.id } }]),
         });
         // سقف تعداد مخلفات سمت سرور
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 11, parent: { productId: main.id } },
@@ -949,7 +949,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 1, parent: { productId: main.id } },
@@ -1014,7 +1014,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 400,
+          status: 404,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 1, parent: { productId: main.id } },

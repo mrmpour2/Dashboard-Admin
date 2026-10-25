@@ -44,9 +44,14 @@ const LANGUAGE_RULES = `If language is Persian (fa), respond fluently, respectfu
 function partText(parts) {
   if (!Array.isArray(parts)) return "";
   return parts
-    .map((p) =>
-      typeof p === "object" && p !== null ? p.text || "" : String(p),
-    )
+    .map((p) => {
+      if (typeof p === "string") return p;
+      if (typeof p === "object" && p !== null) {
+        return p.text || p.content || "";
+      }
+      return "";
+    })
+    .filter(Boolean)
     .join("\n")
     .slice(0, 4000);
 }
@@ -55,14 +60,23 @@ function normalizeMessages(messages) {
   if (!Array.isArray(messages)) return [];
   return messages
     .filter((m) => m && (m.role === "user" || m.role === "assistant"))
-    .map((m) => ({
-      id: typeof m.id === "string" ? m.id.slice(0, 100) : randomUUID(),
-      role: m.role,
-      content:
-        typeof m.content === "string"
-          ? m.content.slice(0, 4000)
-          : partText(m.parts),
-    }))
+    .map((m, index) => {
+      // استخراج متن چه از طریق content و چه از طریق parts
+      let text = "";
+      if (typeof m.content === "string") {
+        text = m.content;
+      } else if (Array.isArray(m.parts)) {
+        text = partText(m.parts);
+      } else if (typeof m.text === "string") {
+        text = m.text;
+      }
+
+      return {
+        id: typeof m.id === "string" ? m.id.slice(0, 100) : `msg-${index}`,
+        role: m.role,
+        content: text.slice(0, 4000),
+      };
+    })
     .filter((m) => m.content.trim().length > 0);
 }
 

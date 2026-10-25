@@ -528,7 +528,8 @@ model ChatOrderItem {
 }
 
 enum ChatPaymentMethod {
-  ZIBAL
+  LEGACY_GATEWAY
+  PAYPING
   CARD_TO_CARD
 }
 
@@ -551,8 +552,11 @@ model ChatPayment {
   status            ChatPaymentStatus @default(INITIATED)
   amountToman       Decimal           @db.Decimal(12, 2)
   amountRial        BigInt?
-  zibalTrackId      String?           @unique
-  zibalRefNumber    String?
+  legacyGatewayTrackId String?         @unique
+  legacyGatewayRefNumber String?
+  paypingPaymentCode   String?        @unique
+  paypingPaymentUrl    String?
+  paypingPaymentRefId  String?
   receiptPath       String?
   transferReference String?
   adminNote         String?           @db.Text
@@ -620,6 +624,8 @@ model SecurityOutbox {
   attempts Int @default(0)
   createdAt DateTime @default(now()) @map("created_at")
   completedAt DateTime? @map("completed_at")
+  lockedAt DateTime? @map("locked_at") @db.Timestamptz(6)
+  @@index([status, attempts, createdAt], map: "security_outbox_status_attempts_created_idx")
   @@map("security_outbox")
 }
 

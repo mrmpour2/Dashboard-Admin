@@ -7,7 +7,7 @@ import { validate } from "../middleware/validate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { chatLimiter } from "../middleware/rateLimiters.js";
 import {
-  createChatOrder, listChatOrders, createZibalRequest, verifyZibalRequest, zibalCallback,
+  createChatOrder, listChatOrders,
   getPaymentConfig, submitCardToCardReceipt, listCardToCardReceipts,
   viewCardToCardReceipt, reviewCardToCardReceipt,
 } from "../controllers/paymentController.js";
@@ -33,8 +33,6 @@ const orderSchema = z.object({ params: empty, query: empty, body: z.object({
     }).optional(),
   })).min(1).max(30),
 }) });
-const paymentRequestSchema = z.object({ params: empty, query: empty, body: z.object({ orderId: z.string().min(1).max(100) }) });
-const verifySchema = z.object({ params: empty, query: empty, body: z.object({ paymentId: z.string().min(1).max(100), trackId: z.union([z.string(), z.number()]) }) });
 const receiptSchema = z.object({ params: empty, query: empty, body: z.object({ orderId: z.string().min(1).max(100), imageData: z.string().min(30).max(7_000_000), transferReference: z.string().max(120).optional() }) });
 const reviewSchema = z.object({ params: z.object({ paymentId: z.string().min(1).max(100) }), query: empty, body: z.object({ decision: z.enum(["approve", "reject"]), note: z.string().max(1000).optional() }) });
 
@@ -46,9 +44,6 @@ router.get("/stock-metrics", requireAuth, requireRole("ADMIN", "MANAGER"), async
 router.get("/config", getPaymentConfig);
 router.get("/orders", requireAuth, requireRole("ADMIN", "MANAGER"), listChatOrders);
 router.post("/orders", chatLimiter, requireCheckoutProof, validate(orderSchema), createChatOrder);
-router.post("/zibal/request", chatLimiter, requireCheckoutProof, validate(paymentRequestSchema), createZibalRequest);
-router.post("/zibal/verify", chatLimiter, validate(verifySchema), verifyZibalRequest);
-router.get("/zibal/callback", zibalCallback);
 router.post("/card-to-card/submit", chatLimiter, requireCheckoutProof, validate(receiptSchema), submitCardToCardReceipt);
 
 // فقط مدیر و مدیر فروش می‌توانند رسیدها را مشاهده یا تأیید کنند.

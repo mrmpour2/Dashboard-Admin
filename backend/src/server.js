@@ -1,9 +1,12 @@
 import { startSecurityJobs } from "./services/securityJobs.js";
+import { assertSecurityProvidersConfig } from "./services/securityProviders.js";
 import app from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
 import { prisma } from "./config/prisma.js";
 
+// Misconfigured SMS/captcha providers must crash the deploy, not the first user request.
+if (env.SECURITY_PROVIDER_MODE !== "disabled") assertSecurityProvidersConfig();
 const stopSecurityJobs = startSecurityJobs();
 const server = app.listen(env.PORT, () => {
   logger.info(`🚀 سرور روی پورت ${env.PORT} در حالت ${env.NODE_ENV} اجرا شد`);

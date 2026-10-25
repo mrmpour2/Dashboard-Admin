@@ -9,7 +9,7 @@ export async function sendCheckoutOtp(req, res, next) {
 }
 export async function verifyCheckoutOtp(req, res, next) {
   try {
-    const phone = await consumeOtp({ ...req.body, subject: "checkout" });
+    const phone = await consumeOtp({ ...req.body, subject: "checkout", ip: req.ip });
     const token = jwt.sign({ phone, scope: "checkout", ipHash: digest(req.ip) }, env.JWT_ACCESS_SECRET,
       { expiresIn: "30m", audience: "checkout", issuer: "elin-checkout" });
     res.cookie("checkout_proof", token, cookieOptions).json({ verified: true });

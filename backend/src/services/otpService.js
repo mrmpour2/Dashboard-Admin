@@ -28,27 +28,37 @@ export async function requestOtp({ phone: rawPhone, subject = "checkout", ip = "
   if (!["checkout", "club"].includes(subject)) throw new BadRequestError("درخواست نامعتبر است.");
   const phoneHash = digest(phone), ipHash = digest(ip);
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
-  const outcome = await prisma.$transaction(async tx => {
-    await lockKeys(tx, [`otp:phone:${phoneHash}`, `otp:ip:${ipHash}`]);
-    const day = new Date(now.getTime() - 86400000);
-    const phoneCount = await tx.otpCode.count({ where: { phoneHash, createdAt: { gte: day } } });
-    const ipCount = await tx.otpCode.count({ where: { ipHash, createdAt: { gte: day } } });
-    const latest = await tx.otpCode.findFirst({ where: { phoneHash, subject }, orderBy: { createdAt: "desc" } });
-    if (phoneCount >= env.OTP_DAILY_PHONE_LIMIT || ipCount >= env.OTP_DAILY_IP_LIMIT ||
-        (latest && now.getTime() - latest.createdAt.getTime() < 60000)) {
-      await securityAudit(tx, "otp.rate_limited", phone, { ipHash });
-      return { error: "RATE_LIMITED" };
+  // The captcha provider call is an HTTP request (up to seconds); it must never run
+  // while a transaction holds advisory locks. So: transaction -> (captcha) -> transaction.
+  let captchaVerified = false;
+  let outcome;
+  for (let pass = 0; pass < 2; pass++) {
+    outcome = await prisma.$transaction(async tx => {
+      await lockKeys(tx, [`otp:phone:${phoneHash}`, `otp:ip:${ipHash}`]);
+      const day = new Date(now.getTime() - 86400000);
+      const phoneCount = await tx.otpCode.count({ where: { phoneHash, createdAt: { gte: day } } });
+      const ipCount = await tx.otpCode.count({ where: { ipHash, createdAt: { gte: day } } });
+      const latest = await tx.otpCode.findFirst({ where: { phoneHash, subject }, orderBy: { createdAt: "desc" } });
+      if (phoneCount >= env.OTP_DAILY_PHONE_LIMIT || ipCount >= env.OTP_DAILY_IP_LIMIT ||
+          (latest && now.getTime() - latest.createdAt.getTime() < 60000)) {
+        await securityAudit(tx, "otp.rate_limited", phone, { ipHash });
+        return { error: "RATE_LIMITED" };
+      }
+      if (phoneCount >= 3 && !captchaVerified) return { needCaptcha: true };
+      await tx.otpCode.updateMany({ where: { phoneHash, subject, consumedAt: null }, data: { consumedAt: now } });
+      const otp = await tx.otpCode.create({ data: { phoneHash, ipHash, subject, codeHash: digest(`${subject}:${phone}:${code}`),
+        createdAt: now, expiresAt: new Date(now.getTime() + 300000) } });
+      return { id: otp.id };
+    }, { timeout: 10000 });
+    if (!outcome.needCaptcha) break;
+    if (!await securityProviders.verifyCaptcha(captchaToken, ip === "unknown" ? undefined : ip)) {
+      await securityAudit(prisma, "otp.captcha_required", phone, { ipHash });
+      outcome = { error: "CAPTCHA_REQUIRED" };
+      break;
     }
-    if (phoneCount >= 3 && !await securityProviders.verifyCaptcha(captchaToken)) {
-      await securityAudit(tx, "otp.captcha_required", phone, { ipHash });
-      return { error: "CAPTCHA_REQUIRED" };
-    }
-    await tx.otpCode.updateMany({ where: { phoneHash, subject, consumedAt: null }, data: { consumedAt: now } });
-    const otp = await tx.otpCode.create({ data: { phoneHash, ipHash, subject, codeHash: digest(`${subject}:${phone}:${code}`),
-      createdAt: now, expiresAt: new Date(now.getTime() + 300000) } });
-    return { id: otp.id };
-  });
-  if (outcome.error) throw new AppError("امکان ارسال کد نیست؛ کمی بعد تلاش کنید.", 429, outcome.error);
+    captchaVerified = true;
+  }
+  if (outcome.error || outcome.needCaptcha) throw new AppError("امکان ارسال کد نیست؛ کمی بعد تلاش کنید.", 429, outcome.error ?? "CAPTCHA_REQUIRED");
   try { await securityProviders.sendOtp({ phone, code, subject }); }
   catch (error) {
     await prisma.otpCode.update({ where: { id: outcome.id }, data: { consumedAt: now } });
@@ -57,18 +67,26 @@ export async function requestOtp({ phone: rawPhone, subject = "checkout", ip = "
   return { challengeId: outcome.id, message: "در صورت امکان، کد تأیید ارسال می‌شود.", expiresIn: 300, resendAfter: 60 };
 }
 // Errors are returned from the transaction so failed-attempt counters commit.
-export async function consumeOtp({ challengeId, phone: rawPhone, subject, code, captchaToken, now = new Date() }) {
+export async function consumeOtp({ challengeId, phone: rawPhone, subject, code, captchaToken, ip, now = new Date() }) {
   const phone = normalizeMobile(rawPhone);
+  // Captcha (HTTP) is checked BEFORE the row-locking transaction, only when this challenge
+  // already has 3+ failed attempts. The authoritative attempts check still runs under the lock.
+  let captchaVerified = false;
+  const preview = await prisma.otpCode.findUnique({ where: { id: String(challengeId) }, select: { attempts: true } });
+  if (preview && preview.attempts >= 3 && preview.attempts < 5) {
+    captchaVerified = await securityProviders.verifyCaptcha(captchaToken, ip);
+    if (!captchaVerified) {
+      await securityAudit(prisma, "otp.captcha_required", phone);
+      throw new AppError("کد تأیید معتبر نیست یا منقضی شده است.", 429, "CAPTCHA_REQUIRED");
+    }
+  }
   const outcome = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM otp_codes WHERE id=${String(challengeId)} FOR UPDATE`;
     const otp = await tx.otpCode.findUnique({ where: { id: String(challengeId) } });
     const expected = digest(`${subject}:${phone}:${String(code)}`);
     const valid = crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(otp?.codeHash ?? "0".repeat(64), "hex"));
     if (!otp || otp.subject !== subject || otp.phoneHash !== digest(phone) || otp.consumedAt || otp.expiresAt <= now || otp.attempts >= 5) return false;
-    if (otp.attempts >= 3 && !await securityProviders.verifyCaptcha(captchaToken)) {
-      await securityAudit(tx, "otp.captcha_required", phone);
-      return "captcha";
-    }
+    if (otp.attempts >= 3 && !captchaVerified) return "captcha";
     await tx.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 }, ...(valid ? { consumedAt: now } : {}) } });
     await securityAudit(tx, valid ? "otp.verified" : "otp.failed", phone, { attempts: otp.attempts + 1 });
     if (!valid && otp.attempts + 1 === 3) {

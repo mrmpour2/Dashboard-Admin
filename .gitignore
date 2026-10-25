@@ -4,10 +4,16 @@ build
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 .vite
 .DS_Store
 *.local
 *.log
+*.sql
+*.dump
+*.zip
+backend/uploads/
 logs
 .vscode/*
 !.vscode/extensions.json

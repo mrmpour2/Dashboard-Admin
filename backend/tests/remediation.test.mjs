@@ -12,7 +12,6 @@ test('Audit regressions against an isolated PostgreSQL schema', async (t) => {
   const { signAccessToken } = await import('../src/utils/tokens.js');
   const { requireAuth } = await import('../src/middleware/auth.js');
   const nativeFetch = globalThis.fetch;
-  env.ZIBAL_MERCHANT = 'audit-mock-only';
 
   async function invoke(controller, req) {
     let error, data;
@@ -29,7 +28,7 @@ test('Audit regressions against an isolated PostgreSQL schema', async (t) => {
     } });
     if (status === 'PENDING_PAYMENT') await prisma.$transaction(tx => stock.reserveStock(tx, order.id, [{ productId: product.id, quantity: 1 }], new Date(Date.now() + 900000)));
     const payment = await prisma.chatPayment.create({ data: { orderId: order.id, method, status: paymentStatus,
-      amountToman: 10000, amountRial: 100000n, ...(method === 'ZIBAL' ? { zibalTrackId: String(Date.now()) } : {}),
+      amountToman: 10000, amountRial: 100000n,
     } });
     return { product, order, payment };
   }
@@ -102,23 +101,6 @@ test('Audit regressions against an isolated PostgreSQL schema', async (t) => {
       assert.equal((await prisma.chatOrder.findUnique({ where: { id: order.id } })).status, 'CANCELLED');
     });
 
-    await t.test('verified gateway success after cancellation queues refund without consuming stock', async () => {
-      const { payment, order } = await makeOrder({ status: 'CANCELLED', method: 'ZIBAL', paymentStatus: 'PENDING' });
-      globalThis.fetch = async () => new Response(JSON.stringify({ result: 100, amount: 100000, orderId: order.orderNumber, refNumber: 'MOCK' }), { status: 200 });
-      const result = await invoke(payments.verifyZibalRequest, { body: { paymentId: payment.id, trackId: payment.zibalTrackId } });
-      assert.equal(result.error, undefined);
-      assert.equal(result.data.refundPending, true);
-      assert.equal((await prisma.chatOrder.findUnique({ where: { id: order.id } })).status, 'REFUND_PENDING');
-    });
-
-    await t.test('two failed gateway callbacks restore stock once', async () => {
-      const { payment, product } = await makeOrder({ method: 'ZIBAL', paymentStatus: 'PENDING' });
-      globalThis.fetch = async () => new Response(JSON.stringify({ result: 202 }), { status: 200 });
-      const results = await Promise.all(Array.from({ length: 4 }, () => invoke(payments.verifyZibalRequest,
-        { body: { paymentId: payment.id, trackId: payment.zibalTrackId } })));
-      assert.ok(results.every((result) => !result.error));
-      assert.equal((await prisma.product.findUnique({ where: { id: product.id } })).stock, 4);
-    });
   } finally {
     globalThis.fetch = nativeFetch;
     await prisma.$disconnect();

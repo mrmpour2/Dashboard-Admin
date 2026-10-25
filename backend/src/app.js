@@ -17,7 +17,12 @@ const app = express();
 
 // در پشت یک reverse proxy (nginx/Cloudflare) اجرا می‌شود، پس به IP واقعی کاربر اعتماد می‌کنیم
 // (لازم برای درست‌کارکردن rate limiting و req.ip)
-app.set("trust proxy", env.TRUSTED_PROXY);
+const trustProxy = /^\d+$/.test(env.TRUSTED_PROXY)
+  ? Number(env.TRUSTED_PROXY)
+  : env.TRUSTED_PROXY.includes(",")
+    ? env.TRUSTED_PROXY.split(",").map((v) => v.trim()).filter(Boolean)
+    : env.TRUSTED_PROXY;
+app.set("trust proxy", trustProxy);
 
 // --- امنیت هدرهای HTTP ---
 app.use(
@@ -37,17 +42,22 @@ app.use(
 );
 // --- CORS محدود به origin(های) مشخص‌شده در env، با پشتیبانی از کوکی ---
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((o) => o.trim());
-app.use(
-  cors({
-    origin(origin, callback) {
-      // درخواست‌های بدون origin (مثل curl/Postman در توسعه) مجاز هستند
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new ForbiddenError("این origin توسط CORS مجاز نیست"));
-    },
-    credentials: true,
-  }),
+const corsMiddleware = cors({
+  origin(origin, callback) {
+    // درخواست‌های بدون origin (مثل curl/Postman در توسعه) مجاز هستند
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new ForbiddenError("این origin توسط CORS مجاز نیست"));
+  },
+  credentials: true,
+});
+// بازگشت از درگاه پرداخت یک ناوبری مرورگر از دامنهٔ درگاه است (نه فراخوانی
+// cross-origin اسکریپت)؛ مرورگر Origin درگاه را می‌فرستد و CORS نباید آن را رد کند.
+// اعتبار این مسیر با verify سمت سرور به درگاه تضمین می‌شود، نه با CORS.
+const CORS_EXEMPT_PATHS = new Set(["/api/payment/payping/callback"]);
+app.use((req, res, next) =>
+  CORS_EXEMPT_PATHS.has(req.path) ? next() : corsMiddleware(req, res, next),
 );
 
 app.use(compression());

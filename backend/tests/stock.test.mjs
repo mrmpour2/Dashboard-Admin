@@ -9,6 +9,7 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
   const fixture = await createFixture();
   const { prisma } = await import("../src/config/prisma.js");
   const payments = await import("../src/controllers/paymentController.js");
+  const paypingController = await import("../src/controllers/paypingController.js");
   const stock = await import("../src/services/stockService.js");
   const otp = await import("../src/services/otpService.js");
   const providers = await import("../src/services/securityProviders.js");
@@ -40,16 +41,23 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
     await prisma.stockReservation.updateMany({ where: { orderId: order.id }, data: { expiresAt: new Date(0) } });
     return stock.releaseExpired({ dryRun: false });
   }
-  async function payment(order, method = "ZIBAL") {
-    return prisma.chatPayment.create({ data: { orderId: order.id, method, status: method === "ZIBAL" ? "PENDING" : "PENDING_REVIEW", amountToman: 10000, amountRial: 100000n,
-      ...(method === "ZIBAL" ? { zibalTrackId: String(++n) } : {}) } });
+  async function payment(order, method = "PAYPING") {
+    return prisma.chatPayment.create({ data: { orderId: order.id, method, status: method === "PAYPING" ? "PENDING" : "PENDING_REVIEW", amountToman: 10000, amountRial: 100000n,
+      ...(method === "PAYPING" ? { paypingPaymentCode: String(++n) } : {}) } });
   }
-  async function verify(p, order) {
-    globalThis.fetch = async () => new Response(JSON.stringify({ result: 100, amount: 100000, orderId: order.orderNumber, refNumber: "MOCK" }));
-    return invoke(payments.verifyZibalRequest, { body: { paymentId: p.id, trackId: p.zibalTrackId } });
+  // Simulates the browser returning from PayPing: callback -> server-side verify (mocked) -> finalize.
+  // `override` changes what the callback payload claims (a tampered/mismatched return).
+  async function verify(p, order, override = {}) {
+    const claim = { paymentCode: p.paypingPaymentCode, paymentRefId: "MOCK-REF", amount: 10000, clientRefId: order.orderNumber, ...override };
+    globalThis.fetch = async () => new Response(JSON.stringify({ amount: 10000, clientRefId: order.orderNumber }), { status: 200 });
+    let location = "";
+    const req = { body: { status: "1", data: claim }, query: {}, log: { error() {} } };
+    await paypingController.payPingCallback(req, { redirect(_code, url) { location = url; } });
+    const outcome = new URL(location, "http://x").searchParams.get("payment");
+    return { error: outcome === "failed" ? { statusCode: 400 } : undefined, data: { verified: outcome === "success", refundPending: outcome === "refund_pending" }, outcome };
   }
   try {
-    env.ZIBAL_MERCHANT = "mock-only";
+    env.PAYPING_TOKEN = "mock-only";
     await check("backfill dry-run preserves data, apply reconstructs legacy on_hand and rerun is idempotent", async () => {
       const product = await item(0);
       await prisma.productStock.delete({ where: { skuId: product.id } });
@@ -100,9 +108,8 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
     });
     await check("mismatched verified amount or order identity never consumes inventory", async () => {
       const product = await item(); const { order } = await create(product), p = await payment(order);
-      for (const fields of [{ orderId: "another-order", amount: 100000 }, { orderId: order.orderNumber, amount: 99999 }]) {
-        globalThis.fetch = async () => new Response(JSON.stringify({ result: 100, ...fields }));
-        const r = await invoke(payments.verifyZibalRequest, { body: { paymentId: p.id, trackId: p.zibalTrackId } });
+      for (const fields of [{ clientRefId: "another-order" }, { amount: 9999 }]) {
+        const r = await verify(p, order, fields);
         assert.equal(r.error?.statusCode, 400);
         const inventory = await prisma.productStock.findUnique({ where: { skuId: product.id } });
         assert.equal(inventory.onHand, 1); assert.equal(inventory.reserved, 1);

@@ -20,7 +20,7 @@ CREATE TYPE "ChatMessageRole" AS ENUM ('USER', 'ASSISTANT');
 CREATE TYPE "ChatOrderStatus" AS ENUM ('PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED');
 
 -- CreateEnum
-CREATE TYPE "ChatPaymentMethod" AS ENUM ('ZIBAL', 'CARD_TO_CARD');
+CREATE TYPE "ChatPaymentMethod" AS ENUM ('LEGACY_GATEWAY', 'CARD_TO_CARD');
 
 -- CreateEnum
 CREATE TYPE "ChatPaymentStatus" AS ENUM ('INITIATED', 'PENDING', 'PAID', 'FAILED', 'PENDING_REVIEW', 'REJECTED');
@@ -205,8 +205,8 @@ CREATE TABLE "chat_payments" (
     "status" "ChatPaymentStatus" NOT NULL DEFAULT 'INITIATED',
     "amountToman" DECIMAL(12,2) NOT NULL,
     "amountRial" BIGINT,
-    "zibalTrackId" TEXT,
-    "zibalRefNumber" TEXT,
+    "legacyGatewayTrackId" TEXT,
+    "legacyGatewayRefNumber" TEXT,
     "receiptPath" TEXT,
     "transferReference" TEXT,
     "adminNote" TEXT,
@@ -291,7 +291,7 @@ CREATE INDEX "chat_order_items_variantId_idx" ON "chat_order_items"("variantId")
 CREATE INDEX "chat_order_items_parentItemId_idx" ON "chat_order_items"("parentItemId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "chat_payments_zibalTrackId_key" ON "chat_payments"("zibalTrackId");
+CREATE UNIQUE INDEX "chat_payments_legacyGatewayTrackId_key" ON "chat_payments"("legacyGatewayTrackId");
 
 -- CreateIndex
 CREATE INDEX "chat_payments_orderId_status_idx" ON "chat_payments"("orderId", "status");
