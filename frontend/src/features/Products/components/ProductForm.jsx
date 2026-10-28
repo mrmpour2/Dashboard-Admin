@@ -1,9 +1,11 @@
-import { useFieldArray, useForm } from "react-hook-form";
-import { Plus, Trash2 } from "lucide-react";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Image as ImageIcon, Plus, Trash2, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Button, Input } from "../../../components/ui";
 import useModal from "../../../components/ui/Modal/context/useModal";
 import { useCreateProduct, useUpdateProduct, useProducts } from "../../../hooks/api/useProducts";
+import { useUploadProductImageMutation } from "../hooks/useProductsQuery";
 
 /**
  * یک سایز/واریانت محصول؛ مثل پیتزای تک‌نفره، دو نفره و شش‌نفره.
@@ -19,10 +21,14 @@ const variantSchema = z.object({
 const schema = z.object({
   name: z.string().trim().min(2, "نام محصول حداقل ۲ کاراکتر باشد").max(200),
   description: z.string().trim().max(2000).optional(),
+  ingredients: z.string().trim().max(2000).optional(),
+  allergenInfo: z.string().trim().max(1000).optional(),
+  purchaseConditions: z.string().trim().max(1000).optional(),
   price: z.coerce.number().positive("قیمت باید بیشتر از صفر باشد"),
   stock: z.coerce.number().int().min(0, "موجودی نمی‌تواند منفی باشد"),
   category: z.string().trim().max(100).optional(),
   imageUrl: z.string().url("آدرس تصویر معتبر نیست").or(z.literal("")),
+  videoUrl: z.string().url("آدرس ویدیو معتبر نیست").refine((value) => !value || /^https?:\/\//i.test(value), "فقط آدرس http یا https مجاز است").or(z.literal("")),
   // سایزها اختیاری‌اند؛ خالی بودن یعنی محصول یک قیمت ثابت دارد.
   variants: z
     .array(variantSchema)
@@ -63,6 +69,10 @@ export default function ProductForm({ product = null }) {
   const updateMutation = useUpdateProduct();
   const isEdit = Boolean(product);
   const mutation = isEdit ? updateMutation : createMutation;
+  const uploadImage = useUploadProductImageMutation();
+  const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [imageError, setImageError] = useState("");
 
   /**
    * فهرست محصولات برای انتخاب مخلفات. یک صفحه کافی است: منوی رستوران کوچک است
@@ -82,10 +92,14 @@ export default function ProductForm({ product = null }) {
     defaultValues: {
       name: product?.name ?? product?.title ?? "",
       description: product?.description ?? "",
+      ingredients: product?.ingredients ?? "",
+      allergenInfo: product?.allergenInfo ?? "",
+      purchaseConditions: product?.purchaseConditions ?? "",
       price: product?.price ?? "",
       stock: product?.stock ?? 0,
       category: product?.category ?? "",
       imageUrl: product?.imageUrl ?? "",
+      videoUrl: product?.videoUrl ?? "",
       // سایزهای ذخیره‌شده محصول تا کاربر بتواند قیمت هر سایز را ویرایش کند.
       variants: (product?.variants ?? []).map((variant) => ({
         label: variant.label ?? "",
@@ -99,6 +113,11 @@ export default function ProductForm({ product = null }) {
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "variants" });
+  const imageUrl = useWatch({ control, name: "imageUrl" });
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   const onSubmit = async (values) => {
     // چک‌باکس‌های بدون انتخاب ممکن است `undefined` بدهند؛ سرور آرایه می‌خواهد.
@@ -107,8 +126,12 @@ export default function ProductForm({ product = null }) {
       addOnIds: Array.isArray(values.addOnIds) ? values.addOnIds : [],
     };
     try {
-      if (isEdit) await updateMutation.mutateAsync({ id: product.id, payload });
-      else await createMutation.mutateAsync(payload);
+      const savedProduct = isEdit
+        ? await updateMutation.mutateAsync({ id: product.id, payload })
+        : await createMutation.mutateAsync(payload);
+      if (imageFile && savedProduct?.id) {
+        await uploadImage.mutateAsync({ id: savedProduct.id, file: imageFile });
+      }
       setOpen(false);
     } catch {
       // Mutation state is rendered below; no unhandled promise is left behind.
@@ -124,10 +147,51 @@ export default function ProductForm({ product = null }) {
         <Input label="موجودی" type="number" min="0" step="1" required error={errors.stock?.message} {...register("stock")} />
       </div>
       <Input label="آدرس تصویر" type="url" error={errors.imageUrl?.message} {...register("imageUrl")} />
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-Border p-3">
+        <div className="flex size-20 items-center justify-center overflow-hidden rounded-lg bg-SurfaceMuted">
+          {(previewUrl || imageUrl) ? <img src={previewUrl || imageUrl} alt={product?.name || "پیش‌نمایش محصول"} className="size-full object-cover" /> : <ImageIcon aria-hidden="true" />}
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-Border px-3 py-2 text-sm">
+          <Upload aria-hidden="true" className="size-4" /> انتخاب تصویر
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
+            if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+              setImageError("فقط فایل‌های JPG، PNG، WebP یا GIF مجاز هستند.");
+              return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+              setImageError("حجم تصویر نباید بیشتر از ۵ مگابایت باشد.");
+              return;
+            }
+            setImageError("");
+            setImageFile(file);
+            setPreviewUrl(URL.createObjectURL(file));
+          }} />
+        </label>
+        <span className="text-xs text-textMuted">JPG، PNG، WebP یا GIF؛ حداکثر ۵ مگابایت</span>
+        {imageError ? <p role="alert" className="w-full text-xs text-red-600">{imageError}</p> : null}
+      </div>
+      <Input label="آدرس ویدیوی محصول (اختیاری)" type="url" error={errors.videoUrl?.message} {...register("videoUrl")} />
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-textPrimary" htmlFor="product-description">توضیحات</label>
         <textarea id="product-description" rows="4" className="w-full rounded-xl border border-Border bg-transparent p-3 text-sm outline-none focus:border-primary" {...register("description")} />
         {errors.description && <p className="text-xs text-red-600">{errors.description.message}</p>}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-textPrimary" htmlFor="product-ingredients">مواد تشکیل‌دهنده</label>
+          <textarea id="product-ingredients" rows="3" className="w-full rounded-xl border border-Border bg-transparent p-3 text-sm outline-none focus:border-primary" {...register("ingredients")} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-textPrimary" htmlFor="product-allergens">حساسیت‌زاها</label>
+          <textarea id="product-allergens" rows="3" className="w-full rounded-xl border border-Border bg-transparent p-3 text-sm outline-none focus:border-primary" {...register("allergenInfo")} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-textPrimary" htmlFor="product-purchase-conditions">شرایط خرید و آماده‌سازی</label>
+        <textarea id="product-purchase-conditions" rows="2" className="w-full rounded-xl border border-Border bg-transparent p-3 text-sm outline-none focus:border-primary" {...register("purchaseConditions")} />
       </div>
       <fieldset className="space-y-3 rounded-xl border border-Border p-3">
         <legend className="px-1 text-sm font-medium text-textPrimary">سایزها (اختیاری)</legend>
@@ -212,10 +276,10 @@ export default function ProductForm({ product = null }) {
         ) : null}
       </fieldset>
 
-      {mutation.isError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">ذخیره محصول ناموفق بود. دوباره تلاش کنید.</p>}
-      <div className="flex justify-end gap-2 border-t border-Border pt-4">
+      {(mutation.isError || uploadImage.isError) && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">ذخیره محصول ناموفق بود. دوباره تلاش کنید.</p>}
+      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-Border bg-Surface py-3">
         <Button type="button" variant="secondary" onClick={() => setOpen(false)}>انصراف</Button>
-        <Button type="submit" loading={mutation.isPending}>{isEdit ? "ذخیره تغییرات" : "افزودن محصول"}</Button>
+        <Button type="submit" loading={mutation.isPending || uploadImage.isPending}>{isEdit ? "ذخیره تغییرات" : "افزودن محصول"}</Button>
       </div>
     </form>
   );

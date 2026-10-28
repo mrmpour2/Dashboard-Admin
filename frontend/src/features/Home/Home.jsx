@@ -1,12 +1,13 @@
+import { lazy, Suspense } from "react";
 import { Link } from "react-router";
 import { Users, ShoppingBag, Ticket, Wallet, ArrowLeft, PackageCheck } from "lucide-react";
 import StatCard from "./components/StatCard";
-import RevenueChart from "./components/RevenueChart";
 import RecentActivity from "./components/RecentActivity";
 import QueryState from "../../components/QueryState";
 import { useDashboard } from "./useDashboard";
 
 const number = new Intl.NumberFormat("fa-IR");
+const RevenueChart = lazy(() => import("./components/RevenueChart"));
 const statDefinitions = [
   { key: "revenue", title: "مجموع فروش", suffix: "تومان", icon: Wallet },
   { key: "orders", title: "سفارش ثبت‌شده", suffix: "سفارش", icon: ShoppingBag },
@@ -39,7 +40,16 @@ export default function Home() {
             </div>
           </div>
           <div className="grid grid-cols-1 divide-y divide-Border rounded-xl border border-Border bg-Surface sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">{statDefinitions.map(({ key, ...stat }) => <StatCard key={key} {...stat} value={number.format(stats[key] || 0)} />)}</div>
-          <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]"><RevenueChart data={data?.weeklyRevenue || []} /><RecentActivity orders={data?.recentOrders || []} /></div>
+          <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]"><Suspense fallback={<div className="h-80 animate-pulse rounded-xl bg-SurfaceMuted" />}><RevenueChart data={data?.monthlyRevenue || []} /></Suspense><RecentActivity orders={data?.recentOrders || []} /></div>
+          <section className="grid gap-6 rounded-xl border border-Border bg-Surface p-5 sm:grid-cols-3" aria-labelledby="club-metrics-title">
+            <div className="sm:col-span-3"><h2 id="club-metrics-title" className="font-bold text-textPrimary">شاخص‌های باشگاه مشتریان</h2><p className="mt-1 text-xs text-textSecondary">بر اساس اعضا و تراکنش‌های واقعی ثبت‌شده</p></div>
+            <p className="text-sm text-textSecondary">اعضا: <strong className="text-textPrimary">{number.format(data?.club?.members ?? 0)}</strong></p>
+            <p className="text-sm text-textSecondary">عضویت جدید در ۱۲ ماه: <strong className="text-textPrimary">{number.format(data?.club?.newMembers ?? 0)}</strong></p>
+            <p className="text-sm text-textSecondary">فعال در ۳۰ روز: <strong className="text-textPrimary">{number.format(data?.club?.activeMembers ?? 0)}</strong></p>
+            <p className="text-sm text-textSecondary">امتیازهای در دسترس: <strong className="text-textPrimary">{number.format(data?.club?.availablePoints ?? 0)}</strong></p>
+            <div className="sm:col-span-2"><h3 className="mb-2 text-sm font-semibold text-textPrimary">اعضای دارای بیشترین امتیاز</h3><ol className="grid gap-2 sm:grid-cols-2">{(data?.club?.topMembers ?? []).map((member) => <li key={member.id} className="flex justify-between gap-3 text-sm"><span className="truncate">{member.name}</span><span>{number.format(member.pointsBalance)}</span></li>)}</ol></div>
+          </section>
+          <p className="text-xs text-textSecondary" role="status">آمار سبدهای رهاشده در دسترس نیست؛ رخداد سبد هنوز ثبت نمی‌شود.</p>
         </div>
       </QueryState>
     </section>

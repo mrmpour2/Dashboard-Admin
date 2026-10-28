@@ -49,6 +49,10 @@ const addOnIdsSchema = z
   .max(12, "حداکثر ۱۲ مخلفات برای هر محصول")
   .refine((ids) => new Set(ids).size === ids.length, { message: "مخلفات تکراری مجاز نیست" });
 
+const optionalHttpUrlSchema = z.string().url().refine((value) => {
+  return value.startsWith("http://") || value.startsWith("https://");
+}, "آدرس باید با http یا https شروع شود").or(z.literal(""));
+
 export const createProductSchema = z.object({
   query: z.object({}).optional(),
   params: z.object({}).optional(),
@@ -62,6 +66,7 @@ export const createProductSchema = z.object({
     stock: z.coerce.number().int().min(0).default(0),
     category: z.string().trim().max(100).optional(),
     imageUrl: z.string().url().optional().or(z.literal("")),
+    videoUrl: optionalHttpUrlSchema.optional(),
     // سایزهای قابل انتخاب؛ خالی یا نبودن یعنی محصول تک‌قیمت است.
     variants: variantsSchema.optional(),
     // مخلفات پیشنهادی این محصول؛ خالی یعنی هیچ پیشنهادی ندارد.

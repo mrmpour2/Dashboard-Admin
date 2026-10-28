@@ -35,6 +35,7 @@ const PRODUCT_FIELDS = {
   stock: true,
   category: true,
   imageUrl: true,
+  videoUrl: true,
   // واریانت‌ها (سایز/بسته) با ترتیب نمایش پنل؛ غیرفعال‌ها نمایش داده نمی‌شوند.
   variants: {
     where: { isActive: true },
@@ -103,6 +104,7 @@ function toPublicMenuItem(product, slug) {
     price: variantPrices.length ? Math.min(...variantPrices) : Number(product.price),
     currency: "IRT",
     image: (product.imageUrl ?? "").trim() || null,
+    videoUrl: (product.videoUrl ?? "").trim() || null,
     stock: product.stock,
     available,
     addOnCount,

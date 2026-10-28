@@ -96,7 +96,7 @@ function Products() {
             <Modal.Trigger>
               <Button icon={<Plus className="size-4" />}>افزودن محصول</Button>
             </Modal.Trigger>
-            <Modal.Content className="max-w-2xl">
+            <Modal.Content className="max-w-5xl">
               <Modal.Content.Header>
                 <div>
                   <h2 className="text-lg font-bold text-textPrimary">
@@ -210,7 +210,7 @@ function Products() {
                             ویرایش
                           </Button>
                         </Modal.Trigger>
-                        <Modal.Content className="max-w-2xl">
+                        <Modal.Content className="max-w-5xl">
                           <Modal.Content.Header>
                             <div>
                               <h2 className="text-lg font-bold text-textPrimary">
