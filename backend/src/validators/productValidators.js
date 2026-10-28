@@ -55,6 +55,9 @@ export const createProductSchema = z.object({
   body: z.object({
     name: z.string().trim().min(2).max(200),
     description: z.string().trim().max(2000).optional(),
+    ingredients: z.string().trim().max(2000).optional(),
+    allergenInfo: z.string().trim().max(1000).optional(),
+    purchaseConditions: z.string().trim().max(1000).optional(),
     price: z.coerce.number().positive("قیمت باید عددی مثبت باشد"),
     stock: z.coerce.number().int().min(0).default(0),
     category: z.string().trim().max(100).optional(),

@@ -19,6 +19,14 @@ export const authLimiter = rateLimit({
   message: { message: "تعداد تلاش‌های ورود بیش از حد مجاز است. ۱۵ دقیقه دیگر تلاش کنید." },
 });
 
+export const checkoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "تعداد درخواست‌های خرید بیش از حد مجاز است. کمی بعد تلاش کنید." },
+});
+
 // دستیار گفتگو هر درخواست را به مدل زبانی می‌فرستد (هزینه و تأخیر دارد)،
 // پس جدا از محدودیت عمومی کنترل می‌شود.
 export const chatLimiter = rateLimit({

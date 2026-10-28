@@ -41,8 +41,8 @@ const envSchema = z.object({
   STORE_ADDRESS: z
     .string()
     .trim()
-    .default("بیرجند ،خیابان پاسداران - تقاطع 15 خرداد"),
-  STORE_HOURS: z.string().trim().default("ساعت کاری 1700 الی 2400."),
+    .default("بیرجند - خیابان پاسداران - تقاطع ۱۵ خرداد"),
+  STORE_HOURS: z.string().trim().default("نیاز به مقدار واقعی"),
   SHIPPING_POLICY: z
     .string()
     .trim()
@@ -51,13 +51,11 @@ const envSchema = z.object({
     .string()
     .trim()
     .default("شرایط بازگشت کالا هنوز تنظیم نشده است."),
-  SUPPORT_PHONE: z.string().trim().default(""),
-  PAYPING_TOKEN: z.string().trim().default(""),
+  DELIVERY_FEE_TOMAN: z.coerce.number().int().min(0).default(100000),
+  VAT_RATE_BPS: z.coerce.number().int().min(0).max(10000).default(1000),
+  SUPPORT_PHONE: z.string().trim().default("05632420101"),
   PUBLIC_API_BASE_URL: z.string().url().default("http://localhost:5000/api"),
   FRONTEND_URL: z.string().url().default("http://localhost:5174"),
-  CARD_TO_CARD_NUMBER: z.string().trim().default(""),
-  CARD_TO_CARD_OWNER: z.string().trim().default(""),
-  CARD_TO_CARD_BANK: z.string().trim().default(""),
   SECURITY_PROVIDER_MODE: z
     .enum(["disabled", "mock", "sandbox", "production"])
     .default("mock"),

@@ -4,10 +4,8 @@ import {
   pipeUIMessageStreamToResponse,
   streamText,
   toUIMessageStream,
-  tool,
 } from "ai";
 import { randomUUID } from "crypto";
-import { z } from "zod";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import { logger } from "../config/logger.js";
@@ -116,7 +114,7 @@ Rules:
 1. Only recommend and sell items from the "Current Menu Items" list above. Never invent products or prices.
 2. If an item is out of stock, inform the customer politely and suggest alternatives.
 3. Be concise, direct, helpful, and polite.
-4. When the customer decides to order items, you MUST use the "createOrder" tool to submit their order. Ask for their delivery address and name if not provided yet.`;
+4. Never claim to place or confirm an order. Direct customers to the website checkout to review the total and submit an order.`;
 }
 
 export async function chat(req, res, next) {
@@ -174,61 +172,7 @@ export async function chat(req, res, next) {
       messages: modelMessages,
       temperature: 0.35,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
-      tools: {
-        createOrder: tool({
-          description:
-            "ثبت نهایی سفارش مشتری در سیستم بر اساس محصولات موجود در منو",
-          parameters: z.object({
-            customerName: z.string().describe("نام مشتری"),
-            customerPhone: z.string().describe("شماره تماس مشتری"),
-            address: z.string().describe("آدرس کامل تحویل سفارش"),
-            items: z
-              .array(
-                z.object({
-                  productId: z.string().describe("شناسه یا آی‌دی محصول از منو"),
-                  quantity: z
-                    .number()
-                    .min(1)
-                    .describe("تعداد سفارش از این محصول"),
-                }),
-              )
-              .describe("لیست اقلام سفارش داده شده"),
-          }),
-          execute: async ({ customerName, customerPhone, address, items }) => {
-            try {
-              const newOrder = await prisma.order.create({
-                data: {
-                  customerName,
-                  customerPhone,
-                  shippingAddress: address,
-                  status: "PENDING",
-                  totalAmount: 0,
-                  items: {
-                    create: items.map((item) => ({
-                      productId: item.productId,
-                      quantity: item.quantity,
-                      price: 0,
-                    })),
-                  },
-                },
-              });
-
-              return {
-                success: true,
-                orderId: newOrder.id,
-                message: `سفارش شما با موفقیت ثبت شد. کد پیگیری: ${newOrder.id}`,
-              };
-            } catch (err) {
-              logger.error({ err }, "Order creation tool execution failed");
-              return {
-                success: false,
-                message:
-                  "متأسفانه در ثبت سفارش خطایی رخ داد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.",
-              };
-            }
-          },
-        }),
-      },
+      abortSignal: AbortSignal.timeout(15000),
       onFinish: async ({ text }) => {
         try {
           if (text && text.trim().length > 0) {

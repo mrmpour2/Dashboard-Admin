@@ -15,6 +15,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
+    "seed:cheeseburger": "node prisma/seedCheeseburger.js",
     "seed:club": "node prisma/seedClub.js"
   },
   "license": "UNLICENSED",

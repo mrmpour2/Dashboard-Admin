@@ -67,7 +67,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/auth/register", {
           method: "POST",
           body: {},
-          status: 400,
+          status: 404,
         });
       },
     );
@@ -227,12 +227,12 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/coupons", {
           method: "POST",
           body: { code: "BIG", discountValue: 101 },
-          status: 404,
+          status: 400,
         });
         await request(`/coupons/${coupon.id}`, {
           method: "PATCH",
           body: { discountValue: 101 },
-          status: 404,
+          status: 400,
         });
         await request(`/coupons/${coupon.id}`, {
           method: "PATCH",
@@ -280,12 +280,12 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
             couponCode: undefined,
             items: [{ productId: product.id, quantity: 999 }],
           },
-          status: 404,
+          status: 400,
         });
         await request("/orders", {
           method: "POST",
           body: { ...body, items: [...body.items, ...body.items] },
-          status: 404,
+          status: 400,
         });
         await request(`/orders/${order.id}/status`, {
           method: "PATCH",
@@ -312,7 +312,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request(`/orders/${order.id}/status`, {
           method: "PATCH",
           body: { status: "PENDING" },
-          status: 404,
+          status: 400,
         });
         const sales = await request("/dashboard");
         assert.equal(sales.data.stats.revenue, 0);
@@ -595,19 +595,19 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
           method: "POST",
           token: null,
           body: {},
-          status: 404,
+          status: 400,
         });
         await request("/chat", {
           method: "POST",
           token: null,
           body: { messages: [] },
-          status: 404,
+          status: 400,
         });
         await request("/chat", {
           method: "POST",
           token: null,
           body: { messages: [{ role: "tool", content: "x" }] },
-          status: 404,
+          status: 400,
         });
       },
     );
@@ -615,8 +615,10 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
       "chat commerce endpoints validate input and reserve live stock",
       async () => {
         const config = await request("/payment/config", { token: null });
-        assert.equal(typeof config.data.paypingEnabled, "boolean");
-        assert.equal(typeof config.data.cardToCard.enabled, "boolean");
+        assert.equal(config.data.dargah.enabled, false);
+        assert.equal(config.data.cod.enabled, true);
+        assert.equal(config.data.deliveryFeeToman, 100000);
+        assert.equal(config.data.vatRateBps, 1000);
         await request("/payment/orders", {
           method: "POST",
           token: null,
@@ -625,7 +627,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
             customerPhone: "09120000000",
             items: [],
           },
-          status: 404,
+          status: 400,
         });
         const checkoutProduct = (
           await request("/products", {
@@ -652,9 +654,23 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
           },
         });
         assert.match(checkout.data.order.orderNumber, /^WEB-/);
-        assert.equal(checkout.data.order.totalAmount, 250000);
+        assert.equal(checkout.data.order.totalAmount, 375000);
+        assert.equal(checkout.data.order.taxAmount, 25000);
+        assert.equal(checkout.data.order.deliveryFeeAmount, 100000);
         assert.equal(checkout.data.order.status, "RESERVED");
-        await request("/payment/legacy-gateway/request", {
+        const confirmation = await request(`/payment/orders/${checkout.data.order.id}/confirm-cod`, {
+          method: "POST",
+          token: null,
+        });
+        assert.equal(confirmation.data.order.status, "CONFIRMED");
+        assert.equal(confirmation.data.order.paymentMethod, "CASH_ON_DELIVERY");
+        assert.equal(confirmation.data.order.totalAmount, 375000);
+        const duplicateConfirmation = await request(`/payment/orders/${checkout.data.order.id}/confirm-cod`, {
+          method: "POST",
+          token: null,
+        });
+        assert.equal(duplicateConfirmation.data.order.status, "CONFIRMED");
+        await request("/payment/dargah/request", {
           method: "POST",
           token: null,
           body: {},
@@ -696,7 +712,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         // برچسب تکراری باید پیش از رسیدن به دیتابیس رد شود
         await request("/products", {
           method: "POST",
-          status: 404,
+          status: 400,
           body: {
             name: "پیتزا با سایز تکراری",
             price: "100000",
@@ -762,7 +778,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
             ],
           },
         });
-        assert.equal(order.data.order.totalAmount, 245000 + 1010000 * 2);
+        assert.equal(order.data.order.totalAmount, 245000 + 1010000 * 2 + 326500);
         assert.equal(order.data.order.items.length, 2);
         assert.equal(
           order.data.order.items.find((item) => item.variantLabel === "شش نفره").unitPrice,
@@ -775,7 +791,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: {
             customerName: "مشتری واریانت",
             customerPhone: "09120000001",
@@ -787,7 +803,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: {
             customerName: "مشتری واریانت",
             customerPhone: "09120000001",
@@ -847,22 +863,22 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         // اعتبارسنجی: خودمحصول، شناسه نامعتبر، شناسه ناشناخته و تکراری
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 404,
+          status: 400,
           body: { addOnIds: [main.id] },
         });
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 404,
+          status: 400,
           body: { addOnIds: ["not-a-cuid"] },
         });
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 404,
+          status: 400,
           body: { addOnIds: ["cnotarealproduct000000000"] },
         });
         await request(`/products/${main.id}`, {
           method: "PATCH",
-          status: 404,
+          status: 400,
           body: { addOnIds: [drink.id, drink.id] },
         });
 
@@ -912,7 +928,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: unconfigured.id, quantity: 1, parent: { productId: main.id } },
@@ -922,7 +938,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 1, parent: { productId: unconfigured.id } },
@@ -932,14 +948,14 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: orderBody([{ productId: main.id, quantity: 1, parent: { productId: main.id } }]),
         });
         // سقف تعداد مخلفات سمت سرور
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 11, parent: { productId: main.id } },
@@ -949,7 +965,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 1, parent: { productId: main.id } },
@@ -967,7 +983,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
             { productId: drink.id, quantity: 3, parent: { productId: main.id } },
           ]),
         });
-        assert.equal(order.data.order.totalAmount, 300000 * 2 + 80000 * 3);
+        assert.equal(order.data.order.totalAmount, 300000 * 2 + 80000 * 3 + 184000);
         const mainLine = order.data.order.items.find((item) => item.name === main.name);
         const addOnLine = order.data.order.items.find((item) => item.name === drink.name);
         assert.equal(mainLine.parentKey, null);
@@ -999,7 +1015,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
           ]),
         });
         assert.equal(both.data.order.items.length, 3);
-        assert.equal(both.data.order.totalAmount, 300000 + 80000 * 2);
+        assert.equal(both.data.order.totalAmount, 300000 + 80000 * 2 + 146000);
 
         // پاک‌کردن پیکربندی: پیشنهادها از منو و سفارش حذف می‌شوند
         const cleared = (
@@ -1014,7 +1030,7 @@ test("Store API against isolated PostgreSQL schema", async (t) => {
         await request("/payment/orders", {
           method: "POST",
           token: null,
-          status: 404,
+          status: 400,
           body: orderBody([
             { productId: main.id, quantity: 1 },
             { productId: drink.id, quantity: 1, parent: { productId: main.id } },

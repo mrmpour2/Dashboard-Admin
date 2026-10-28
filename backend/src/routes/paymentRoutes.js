@@ -1,15 +1,13 @@
 import { stockMetrics } from "../services/securityJobs.js";
 import { sendCheckoutOtp, verifyCheckoutOtp, requireCheckoutProof } from "../controllers/otpController.js";
-import { readGuestOrder, cancelGuestOrder } from "../controllers/paymentController.js";
+import { readGuestOrder, cancelGuestOrder, confirmCashOnDelivery } from "../controllers/paymentController.js";
 import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { chatLimiter } from "../middleware/rateLimiters.js";
+import { checkoutLimiter } from "../middleware/rateLimiters.js";
 import {
-  createChatOrder, listChatOrders,
-  getPaymentConfig, submitCardToCardReceipt, listCardToCardReceipts,
-  viewCardToCardReceipt, reviewCardToCardReceipt,
+  createChatOrder, listChatOrders, getPaymentConfig,
 } from "../controllers/paymentController.js";
 
 const router = Router();
@@ -33,21 +31,14 @@ const orderSchema = z.object({ params: empty, query: empty, body: z.object({
     }).optional(),
   })).min(1).max(30),
 }) });
-const receiptSchema = z.object({ params: empty, query: empty, body: z.object({ orderId: z.string().min(1).max(100), imageData: z.string().min(30).max(7_000_000), transferReference: z.string().max(120).optional() }) });
-const reviewSchema = z.object({ params: z.object({ paymentId: z.string().min(1).max(100) }), query: empty, body: z.object({ decision: z.enum(["approve", "reject"]), note: z.string().max(1000).optional() }) });
 
-router.post("/otp/request", chatLimiter, validate(z.object({ body: z.object({ phone: z.string().max(20), captchaToken: z.string().max(2048).optional() }) })), sendCheckoutOtp);
-router.post("/otp/verify", chatLimiter, validate(z.object({ body: z.object({ phone: z.string().max(20), challengeId: z.string().max(100), code: z.string().regex(/^\d{6}$/), captchaToken: z.string().max(2048).optional() }) })), verifyCheckoutOtp);
-router.get("/orders/:orderId", requireCheckoutProof, readGuestOrder);
-router.post("/orders/:orderId/cancel", requireCheckoutProof, cancelGuestOrder);
+router.post("/otp/request", checkoutLimiter, validate(z.object({ body: z.object({ phone: z.string().max(20), captchaToken: z.string().max(2048).optional() }) })), sendCheckoutOtp);
+router.post("/otp/verify", checkoutLimiter, validate(z.object({ body: z.object({ phone: z.string().max(20), challengeId: z.string().max(100), code: z.string().regex(/^\d{6}$/), captchaToken: z.string().max(2048).optional() }) })), verifyCheckoutOtp);
+router.get("/orders/:orderId", checkoutLimiter, requireCheckoutProof, readGuestOrder);
+router.post("/orders/:orderId/cancel", checkoutLimiter, requireCheckoutProof, cancelGuestOrder);
+router.post("/orders/:orderId/confirm-cod", checkoutLimiter, requireCheckoutProof, confirmCashOnDelivery);
 router.get("/stock-metrics", requireAuth, requireRole("ADMIN", "MANAGER"), async (_req, res, next) => { try { res.json(await stockMetrics()); } catch(error) { next(error); } });
 router.get("/config", getPaymentConfig);
 router.get("/orders", requireAuth, requireRole("ADMIN", "MANAGER"), listChatOrders);
-router.post("/orders", chatLimiter, requireCheckoutProof, validate(orderSchema), createChatOrder);
-router.post("/card-to-card/submit", chatLimiter, requireCheckoutProof, validate(receiptSchema), submitCardToCardReceipt);
-
-// فقط مدیر و مدیر فروش می‌توانند رسیدها را مشاهده یا تأیید کنند.
-router.get("/card-to-card/receipts", requireAuth, requireRole("ADMIN", "MANAGER"), listCardToCardReceipts);
-router.get("/card-to-card/receipts/:paymentId/image", requireAuth, requireRole("ADMIN", "MANAGER"), viewCardToCardReceipt);
-router.patch("/card-to-card/receipts/:paymentId/review", requireAuth, requireRole("ADMIN", "MANAGER"), validate(reviewSchema), reviewCardToCardReceipt);
+router.post("/orders", checkoutLimiter, requireCheckoutProof, validate(orderSchema), createChatOrder);
 export default router;

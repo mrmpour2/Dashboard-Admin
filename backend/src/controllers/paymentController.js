@@ -9,61 +9,30 @@ import {
   transitionReservations,
   enforceGuestLimits,
   releaseExpired,
-  finalizeVerifiedPayment,
   cancelChatOrder,
 } from "../services/stockService.js";
 import { AppError } from "../utils/AppError.js";
 import crypto from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
-import { awardOrderPoints } from "../services/clubService.js";
 import {
   BadRequestError,
   NotFoundError,
   ServiceUnavailableError,
 } from "../utils/AppError.js";
 
-const ALLOWED_RECEIPT_TYPES = {
-  "image/jpeg": { ext: ".jpg", magic: [Buffer.from([0xff, 0xd8, 0xff])] },
-  "image/png": {
-    ext: ".png",
-    magic: [Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
-  },
-  "image/webp": {
-    ext: ".webp",
-    magic: [Buffer.from("RIFF"), Buffer.from("WEBP")],
-  },
-};
 const safePaymentSelect = {
   id: true,
   orderId: true,
   method: true,
   status: true,
   amountToman: true,
-  transferReference: true,
   createdAt: true,
 };
 function generateOrderNumber() {
   return `WEB-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
-/**
- * ثبت امتیاز باشگاه پس از پرداخت.
- *
- * خطای امتیاز هرگز نباید پرداخت را ناموفق یا دوباره‌پرداخت کند؛ سفارش قبلاً
- * PAID شده و ثبت امتیاز به‌صورت idempotent قابل تکرار است. برای همین خطا فقط
- * لاگ می‌شود و عدد صفر برمی‌گردد.
- */
-async function safeAwardOrderPoints(orderId) {
-  try {
-    return await awardOrderPoints(orderId);
-  } catch (error) {
-    console.error("club order points failed", error);
-    return { awarded: 0, balanceAfter: null };
-  }
-}
 function moneyToNumber(value) {
   return Number(value);
 }
@@ -268,6 +237,8 @@ export async function createChatOrder(req, res, next) {
         customerEmail,
         shippingAddress,
         normalizedItems,
+        deliveryFeeToman: env.DELIVERY_FEE_TOMAN,
+        vatRateBps: env.VAT_RATE_BPS,
       }),
     );
     const now = new Date();
@@ -387,6 +358,11 @@ export async function createChatOrder(req, res, next) {
         );
         if (!Number.isSafeInteger(Math.round(subtotal)) || subtotal <= 0)
           throw new BadRequestError("مبلغ سفارش معتبر نیست.");
+        const deliveryFeeAmount = env.DELIVERY_FEE_TOMAN;
+        const taxAmount = Math.round((subtotal * env.VAT_RATE_BPS) / 10000);
+        const totalAmount = subtotal + deliveryFeeAmount + taxAmount;
+        if (!Number.isSafeInteger(totalAmount))
+          throw new BadRequestError("مبلغ نهایی سفارش معتبر نیست.");
         const created = await tx.chatOrder.create({
           data: {
             orderNumber: generateOrderNumber(),
@@ -402,7 +378,9 @@ export async function createChatOrder(req, res, next) {
             customerEmail: customerEmail?.trim() || null,
             shippingAddress: shippingAddress.trim(),
             subtotalAmount: subtotal,
-            totalAmount: subtotal,
+            deliveryFeeAmount,
+            taxAmount,
+            totalAmount,
           },
         });
 
@@ -460,6 +438,8 @@ export async function createChatOrder(req, res, next) {
         status: order.status,
         expiresAt: order.expiresAt,
         totalAmount: moneyToNumber(order.totalAmount),
+        deliveryFeeAmount: moneyToNumber(order.deliveryFeeAmount),
+        taxAmount: moneyToNumber(order.taxAmount),
         currency: "TOMAN",
         items: order.items.map((item) => ({
           name: item.product.name,
@@ -493,210 +473,62 @@ export async function createChatOrder(req, res, next) {
 export async function getPaymentConfig(_req, res) {
   res.setHeader("Cache-Control", "no-store");
   res.json({
-    storeName: env.STORE_NAME,
-    cardToCard: {
-      enabled: Boolean(env.CARD_TO_CARD_NUMBER && env.CARD_TO_CARD_OWNER),
-      cardNumber: env.CARD_TO_CARD_NUMBER || null,
-      ownerName: env.CARD_TO_CARD_OWNER || null,
-      bankName: env.CARD_TO_CARD_BANK || null,
-    },
-    paypingEnabled: Boolean(env.PAYPING_TOKEN),
+    dargah: { enabled: false },
+    cod: { enabled: true, methods: ["cash", "pos"] },
+    onlinePayment: { enabled: false },
+    deliveryFeeToman: env.DELIVERY_FEE_TOMAN,
+    vatRateBps: env.VAT_RATE_BPS,
+    currency: "TOMAN",
   });
 }
 
-export async function submitCardToCardReceipt(req, res, next) {
+export async function confirmCashOnDelivery(req, res, next) {
   try {
-    const { orderId, imageData, transferReference } = req.body;
-    const order = await getOrder(String(orderId ?? ""), req);
-    if (!["PENDING_PAYMENT", "RESERVED"].includes(order.status))
-      throw new BadRequestError("این سفارش در وضعیت قابل پرداخت نیست.");
-    if (!env.CARD_TO_CARD_NUMBER || !env.CARD_TO_CARD_OWNER)
-      throw new ServiceUnavailableError(
-        "اطلاعات کارت‌به‌کارت هنوز توسط مدیر تنظیم نشده است.",
-      );
-    if (typeof imageData !== "string" || imageData.length > 7_000_000)
-      throw new BadRequestError("تصویر رسید معتبر نیست یا حجم آن زیاد است.");
-    const match = imageData.match(
-      /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/,
-    );
-    if (!match)
-      throw new BadRequestError("رسید باید تصویر JPG، PNG یا WebP باشد.");
-    const mime = match[1];
-    const bytes = Buffer.from(match[2], "base64");
-    if (!bytes.length || bytes.length > 5 * 1024 * 1024)
-      throw new BadRequestError("حجم تصویر رسید باید کمتر از ۵ مگابایت باشد.");
-    const allowed = ALLOWED_RECEIPT_TYPES[mime];
-    const magicValid =
-      mime === "image/webp"
-        ? bytes.subarray(0, 4).equals(Buffer.from("RIFF")) &&
-          bytes.subarray(8, 12).equals(Buffer.from("WEBP"))
-        : allowed.magic.some((magic) =>
-            bytes.subarray(0, magic.length).equals(magic),
-          );
-    if (!magicValid)
-      throw new BadRequestError(
-        "محتوای فایل با نوع تصویر اعلام‌شده مطابقت ندارد.",
-      );
-    const dir = path.resolve(env.CHAT_RECEIPTS_DIR);
-    await fs.mkdir(dir, { recursive: true });
-    const filename = `${crypto.randomBytes(20).toString("hex")}${allowed.ext}`;
-    const fullPath = path.join(dir, filename);
-    await fs.writeFile(fullPath, bytes, { flag: "wx", mode: 0o600 });
-    try {
-      const payment = await prisma.chatPayment.create({
+    const order = await getOrder(req.params.orderId, req);
+    const confirmed = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM chat_orders WHERE id=${order.id} FOR UPDATE`;
+      const current = await tx.chatOrder.findUnique({ where: { id: order.id } });
+      if (
+        current.status === "CONFIRMED" &&
+        current.paymentMethod === "CASH_ON_DELIVERY"
+      ) return current;
+      if (
+        current.status !== "RESERVED" ||
+        !current.expiresAt ||
+        current.expiresAt <= new Date()
+      ) throw new BadRequestError("رزرو سفارش منقضی یا غیرقابل تأیید است.");
+      const activeReservations = await tx.stockReservation.count({
+        where: { orderId: current.id, orderKind: "chat", status: "active" },
+      });
+      if (!activeReservations)
+        throw new BadRequestError("رزرو موجودی سفارش معتبر نیست.");
+      await transitionReservations(tx, current.id, "consumed", "cod_confirmed");
+      return tx.chatOrder.update({
+        where: { id: current.id },
         data: {
-          orderId: order.id,
-          method: "CARD_TO_CARD",
-          status: "PENDING_REVIEW",
-          amountToman: Number(order.totalAmount),
-          receiptPath: fullPath,
-          transferReference:
-            typeof transferReference === "string"
-              ? transferReference.trim().slice(0, 120) || null
-              : null,
+          status: "CONFIRMED",
+          paymentMethod: "CASH_ON_DELIVERY",
+          expiresAt: null,
         },
       });
-      res.status(201).json({
-        payment: {
-          id: payment.id,
-          status: payment.status,
-          amountToman: Number(payment.amountToman),
-          message: "رسید ثبت شد و پس از بررسی مدیر نتیجه اعلام می‌شود.",
-        },
-      });
-    } catch (error) {
-      await fs.unlink(fullPath).catch(() => {});
-      throw error;
-    }
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function listCardToCardReceipts(_req, res, next) {
-  try {
-    const payments = await prisma.chatPayment.findMany({
-      where: { method: "CARD_TO_CARD" },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: {
-        ...safePaymentSelect,
-        adminNote: true,
-        reviewedAt: true,
-        order: {
-          select: {
-            orderNumber: true,
-            customerName: true,
-            customerPhone: true,
-          },
-        },
-      },
     });
-    res.json({ items: payments });
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function viewCardToCardReceipt(req, res, next) {
-  try {
-    const payment = await prisma.chatPayment.findUnique({
-      where: { id: req.params.paymentId },
-      select: { method: true, receiptPath: true },
-    });
-    if (!payment || payment.method !== "CARD_TO_CARD" || !payment.receiptPath)
-      throw new NotFoundError("تصویر رسید پیدا نشد.");
-    const resolved = path.resolve(payment.receiptPath);
-    const root = path.resolve(env.CHAT_RECEIPTS_DIR) + path.sep;
-    if (!resolved.startsWith(root))
-      throw new NotFoundError("تصویر رسید پیدا نشد.");
-    const ext = path.extname(resolved).toLowerCase();
-    const mime = {
-      ".jpg": "image/jpeg",
-      ".png": "image/png",
-      ".webp": "image/webp",
-    }[ext];
-    if (!mime) throw new NotFoundError("تصویر رسید پیدا نشد.");
-    res.setHeader("Content-Type", mime);
-    res.setHeader("Cache-Control", "private, no-store");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.sendFile(resolved);
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function reviewCardToCardReceipt(req, res, next) {
-  try {
-    const { decision, note } = req.body;
-    if (!["approve", "reject"].includes(decision))
-      throw new BadRequestError("تصمیم بررسی معتبر نیست.");
-    const payment = await prisma.chatPayment.findUnique({
-      where: { id: req.params.paymentId },
-    });
-    if (!payment || payment.method !== "CARD_TO_CARD")
-      throw new NotFoundError("رسید پیدا نشد.");
-    if (payment.status !== "PENDING_REVIEW")
-      throw new BadRequestError("این رسید قبلاً بررسی شده است.");
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM chat_orders WHERE id=${payment.orderId} FOR UPDATE`;
-      const current = await tx.chatPayment.findUnique({
-        where: { id: payment.id },
-      });
-      if (current.status !== "PENDING_REVIEW")
-        throw new BadRequestError("این رسید قبلاً بررسی شده است.");
-      if (decision === "approve")
-        await finalizeVerifiedPayment(tx, payment, { receipt: true });
-      else {
-        const order = await tx.chatOrder.findUnique({
-          where: { id: payment.orderId },
-        });
-        if (!["PENDING_PAYMENT", "RESERVED", "EXPIRED"].includes(order.status))
-          throw new BadRequestError("سفارش در وضعیت قابل بررسی نیست.");
-        await transitionReservations(
-          tx,
-          payment.orderId,
-          "released",
-          "receipt_rejected",
-        );
-        await tx.chatOrder.update({
-          where: { id: payment.orderId },
-          data: { status: "CANCELLED" },
-        });
-        await tx.chatPayment.update({
-          where: { id: payment.id },
-          data: { status: "REJECTED" },
-        });
-      }
-      await tx.chatPayment.update({
-        where: { id: payment.id },
-        data: {
-          reviewedById: req.user.id,
-          reviewedAt: new Date(),
-          ...(typeof note === "string"
-            ? { adminNote: note.trim().slice(0, 1000) }
-            : {}),
-        },
-      });
-      return tx.chatPayment.findUnique({ where: { id: payment.id } });
-    });
-    const award =
-      updated.status === "PAID"
-        ? await safeAwardOrderPoints(payment.orderId)
-        : { awarded: 0, balanceAfter: null };
     res.json({
-      payment: {
-        id: updated.id,
-        status: updated.status,
-        reviewedAt: updated.reviewedAt,
+      order: {
+        id: confirmed.id,
+        orderNumber: confirmed.orderNumber,
+        status: confirmed.status,
+        paymentMethod: "CASH_ON_DELIVERY",
+        subtotalAmount: moneyToNumber(confirmed.subtotalAmount),
+        deliveryFeeAmount: moneyToNumber(confirmed.deliveryFeeAmount),
+        taxAmount: moneyToNumber(confirmed.taxAmount),
+        totalAmount: moneyToNumber(confirmed.totalAmount),
+        currency: "TOMAN",
       },
-      pointsAwarded: award.awarded,
     });
   } catch (error) {
     next(error);
   }
 }
-
 export async function readGuestOrder(req, res, next) {
   try {
     const order = await getOrder(req.params.orderId, req);
