@@ -13,6 +13,7 @@ import {
 } from "../services/stockService.js";
 import { AppError } from "../utils/AppError.js";
 import crypto from "node:crypto";
+import { markCartConverted } from "../services/cartSnapshotService.js";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import {
@@ -383,6 +384,7 @@ export async function createChatOrder(req, res, next) {
             totalAmount,
           },
         });
+        await markCartConverted(tx, sessionId, now);
 
         // ردیف‌ها یکی‌یکی ساخته می‌شوند تا شناسه ردیف اصلی در دست باشد و ردیف
         // مخلفات با `parentItemId` به همان قلم وصل شود (سفارش حداکثر ۳۰ قلم است).

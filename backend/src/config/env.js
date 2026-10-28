@@ -53,6 +53,7 @@ const envSchema = z.object({
     .default("شرایط بازگشت کالا هنوز تنظیم نشده است."),
   DELIVERY_FEE_TOMAN: z.coerce.number().int().min(0).default(100000),
   VAT_RATE_BPS: z.coerce.number().int().min(0).max(10000).default(1000),
+  ABANDONED_CART_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
   SUPPORT_PHONE: z.string().trim().default("05632420101"),
   PUBLIC_API_BASE_URL: z.string().url().default("http://localhost:5000/api"),
   FRONTEND_URL: z.string().url().default("http://localhost:5174"),

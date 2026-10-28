@@ -49,7 +49,16 @@ export default function Home() {
             <p className="text-sm text-textSecondary">امتیازهای در دسترس: <strong className="text-textPrimary">{number.format(data?.club?.availablePoints ?? 0)}</strong></p>
             <div className="sm:col-span-2"><h3 className="mb-2 text-sm font-semibold text-textPrimary">اعضای دارای بیشترین امتیاز</h3><ol className="grid gap-2 sm:grid-cols-2">{(data?.club?.topMembers ?? []).map((member) => <li key={member.id} className="flex justify-between gap-3 text-sm"><span className="truncate">{member.name}</span><span>{number.format(member.pointsBalance)}</span></li>)}</ol></div>
           </section>
-          <p className="text-xs text-textSecondary" role="status">آمار سبدهای رهاشده در دسترس نیست؛ رخداد سبد هنوز ثبت نمی‌شود.</p>
+          <section className="grid gap-4 rounded-xl border border-Border bg-Surface p-5 sm:grid-cols-2 lg:grid-cols-4" aria-labelledby="abandoned-carts-title">
+            <div className="sm:col-span-2 lg:col-span-4"><h2 id="abandoned-carts-title" className="font-bold text-textPrimary">سبدهای خرید</h2><p className="mt-1 text-xs text-textSecondary">سبد فعال پس از {number.format(data?.abandonedCarts?.thresholdMinutes ?? 30)} دقیقه بی‌فعالیتی رهاشده محسوب می‌شود.</p></div>
+            {data?.abandonedCarts?.empty ? <p className="text-sm text-textSecondary sm:col-span-2 lg:col-span-4" role="status">هنوز سبدی برای گزارش وجود ندارد.</p> : <>
+              <p className="text-sm text-textSecondary">فعال: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.active ?? 0)}</strong></p>
+              <p className="text-sm text-textSecondary">تبدیل‌شده: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.converted ?? 0)}</strong></p>
+              <p className="text-sm text-textSecondary">رهاشده: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.abandoned ?? 0)}</strong> ({number.format(Math.round((data?.abandonedCarts?.abandonmentRate ?? 0) * 100))}٪)</p>
+              <p className="text-sm text-textSecondary">ارزش ازدست‌رفته: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.lostValue ?? 0)} تومان</strong></p>
+              <ol className="grid gap-2 sm:col-span-2 lg:col-span-4">{(data?.abandonedCarts?.topItems ?? []).map((item) => <li key={item.productId} className="flex justify-between gap-3 text-sm"><span>{item.name}</span><span>{number.format(item.quantity)}</span></li>)}</ol>
+            </>}
+          </section>
         </div>
       </QueryState>
     </section>

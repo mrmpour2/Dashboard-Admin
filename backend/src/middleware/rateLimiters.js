@@ -27,6 +27,14 @@ export const checkoutLimiter = rateLimit({
   message: { message: "تعداد درخواست‌های خرید بیش از حد مجاز است. کمی بعد تلاش کنید." },
 });
 
+export const cartLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "درخواست‌های سبد بیش از حد مجاز است. کمی بعد تلاش کنید." },
+});
+
 // دستیار گفتگو هر درخواست را به مدل زبانی می‌فرستد (هزینه و تأخیر دارد)،
 // پس جدا از محدودیت عمومی کنترل می‌شود.
 export const chatLimiter = rateLimit({

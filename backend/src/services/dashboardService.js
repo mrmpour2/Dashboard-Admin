@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { env } from "../config/env.js";
 
 export async function getDashboard() {
   const start = new Date();
@@ -10,6 +11,7 @@ export async function getDashboard() {
   monthStart.setUTCMonth(monthStart.getUTCMonth() - 11);
   const clubActiveSince = new Date();
   clubActiveSince.setUTCDate(clubActiveSince.getUTCDate() - 30);
+  const abandonedBefore = new Date(Date.now() - env.ABANDONED_CART_MINUTES * 60_000);
   const [revenue, activeUsers, orders, openTickets, pendingOrders, pendingReviews, lowStock, weekOrders, monthOrders, recentOrders, clubMembers, newClubMembers, activeClubMembers, clubPoints, topClubMembers] = await Promise.all([
     prisma.order.aggregate({ where: { status: { not: "CANCELLED" } }, _sum: { totalAmount: true } }),
     prisma.user.count({ where: { status: "ACTIVE" } }),
@@ -28,7 +30,21 @@ export async function getDashboard() {
     prisma.clubMember.count({ where: { lastLoginAt: { gte: clubActiveSince } } }),
     prisma.clubPointTransaction.aggregate({ where: { status: "available" }, _sum: { points: true } }),
     prisma.clubMember.findMany({ take: 5, orderBy: [{ pointsBalance: "desc" }, { joinedAt: "asc" }], select: { id: true, name: true, pointsBalance: true } }),
+    prisma.cartSnapshot.updateMany({ where: { status: "ACTIVE", lastActivity: { lte: abandonedBefore } }, data: { status: "ABANDONED" } }),
   ]);
+  const cartSnapshots = await prisma.cartSnapshot.findMany({ select: { status: true, totalAmount: true, items: true } });
+  const cartCounts = { active: 0, converted: 0, abandoned: 0 };
+  const lostItems = new Map();
+  let lostValue = 0;
+  for (const cart of cartSnapshots) {
+    cartCounts[cart.status.toLowerCase()] += 1;
+    if (cart.status !== "ABANDONED") continue;
+    lostValue += Number(cart.totalAmount);
+    for (const item of cart.items) lostItems.set(item.productId, (lostItems.get(item.productId) ?? 0) + item.quantity);
+  }
+  const topItemIds = [...lostItems.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topProducts = topItemIds.length ? await prisma.product.findMany({ where: { id: { in: topItemIds.map(([id]) => id) } }, select: { id: true, name: true } }) : [];
+  const productNames = new Map(topProducts.map((product) => [product.id, product.name]));
   const totals = new Map();
   for (const order of weekOrders) {
     const day = order.createdAt.toISOString().slice(0, 10);
@@ -60,7 +76,16 @@ export async function getDashboard() {
     weeklyRevenue,
     monthlyRevenue,
     club: { members: clubMembers, newMembers: newClubMembers, activeMembers: activeClubMembers, availablePoints: Number(clubPoints._sum.points || 0), topMembers: topClubMembers },
-    abandonedCarts: { tracked: false, reason: "سبدهای خرید پیش از ثبت سفارش در این سامانه ذخیره نمی‌شوند." },
+    abandonedCarts: {
+      tracked: true,
+      ...cartCounts,
+      total: cartSnapshots.length,
+      abandonmentRate: cartCounts.abandoned + cartCounts.converted ? cartCounts.abandoned / (cartCounts.abandoned + cartCounts.converted) : 0,
+      lostValue: Math.round(lostValue),
+      topItems: topItemIds.map(([id, quantity]) => ({ productId: id, name: productNames.get(id) ?? "محصول حذف‌شده", quantity })),
+      empty: cartSnapshots.length === 0,
+      thresholdMinutes: env.ABANDONED_CART_MINUTES,
+    },
     recentOrders,
   };
 }
