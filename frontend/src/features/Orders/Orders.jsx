@@ -7,8 +7,10 @@ import QueryState from "../../components/QueryState";
 import CreateOrderModal from "./CreateOrderModal";
 import useToast from "../../components/ui/Toast/ToastContext/useToast";
 import { orderStatusLabels } from "../../utils/enumLabels";
+import { formatPrice } from "../../utils/formatPrice.js";
+import { useState } from "react";
+import SiteOrdersPanel from "./SiteOrdersPanel";
 
-const currencyFormatter = new Intl.NumberFormat("fa-IR");
 const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" });
 const SEARCHABLE_FIELDS = ["orderNumber"];
 const statusOptions = Object.entries(orderStatusLabels);
@@ -68,11 +70,11 @@ function OrdersTableBody({ items }) {
               <Table.Cell>{order.items?.length || 0} قلم</Table.Cell>
               <Table.Cell>
                 <span className="font-medium text-textPrimary">
-                  {currencyFormatter.format(order.totalAmount)} ت
+                  {formatPrice(order.totalAmount)}
                 </span>
                 {order.discountAmount > 0 && (
                   <span className="ms-1.5 text-xs text-profit">
-                    (کد {order.coupon?.code}: ‎-{currencyFormatter.format(order.discountAmount)} ت)
+                    (کد {order.coupon?.code}: ‎-{formatPrice(order.discountAmount)})
                   </span>
                 )}
               </Table.Cell>
@@ -103,15 +105,24 @@ function OrdersTableBody({ items }) {
 }
 
 function Orders() {
+  const [orderSource, setOrderSource] = useState("site");
+  const { hasRole } = useAuth();
   const { data, isLoading, isError, error, refetch } = useOrdersQuery({ pageSize: 50 });
   const items = data?.items || [];
 
   return (
     <div className="mx-auto max-w-5xl p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-textPrimary">سفارشات محصول</h1>
-        <CreateOrderModal />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-textPrimary">مدیریت سفارش‌ها</h1>
+        {orderSource === "panel" && <CreateOrderModal />}
       </div>
+
+      <div className="mb-4 flex gap-2" role="tablist" aria-label="منبع سفارش‌ها">
+        <button type="button" role="tab" aria-selected={orderSource === "site"} onClick={() => setOrderSource("site")} className={`rounded-lg px-4 py-2 text-sm ${orderSource === "site" ? "bg-primary text-white" : "border border-Border text-textSecondary"}`}>سفارش‌های سایت</button>
+        {hasRole("ADMIN", "MANAGER") && <button type="button" role="tab" aria-selected={orderSource === "panel"} onClick={() => setOrderSource("panel")} className={`rounded-lg px-4 py-2 text-sm ${orderSource === "panel" ? "bg-primary text-white" : "border border-Border text-textSecondary"}`}>سفارش‌های ثبت‌شده در پنل</button>}
+      </div>
+
+      {orderSource === "site" ? <SiteOrdersPanel /> : <>
 
       <QueryState
         isLoading={isLoading}
@@ -131,6 +142,7 @@ function Orders() {
           <OrdersTableBody items={items} />
         </Table>
       </QueryState>
+      </>}
     </div>
   );
 }

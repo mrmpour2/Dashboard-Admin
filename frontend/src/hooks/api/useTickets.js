@@ -5,8 +5,9 @@ export function useTickets(params = {}) {
   return useQuery({ queryKey: ["tickets", params], queryFn: async () => { const result = await ticketsApi.list(params); return { ...result, items: result.items.map(normalizeTicket) }; } });
 }
 export function useTicket(id) {
-  return useQuery({ queryKey: ["tickets", id], enabled: Boolean(id), queryFn: async () => { const result = await ticketsApi.get(id); return { ...normalizeTicket(result), description: result.description, comments: result.comments }; } });
+  return useQuery({ queryKey: ["tickets", id], enabled: Boolean(id), queryFn: async () => { const result = await ticketsApi.get(id); return { ...normalizeTicket(result), description: result.description, comments: result.comments, messages: result.messages, statusHistory: result.statusHistory }; } });
 }
+export function useTicketAssignees() { return useQuery({ queryKey: ["ticket-assignees"], queryFn: ticketsApi.assignees }); }
 function useWrite(mutationFn) {
   const client = useQueryClient();
   return useMutation({ mutationFn, onSuccess: () => { client.invalidateQueries({ queryKey: ["tickets"] }); client.invalidateQueries({ queryKey: ["comments"] }); client.invalidateQueries({ queryKey: ["dashboard"] }); } });

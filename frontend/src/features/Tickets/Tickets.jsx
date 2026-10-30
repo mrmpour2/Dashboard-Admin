@@ -5,6 +5,8 @@ import CreateTicketModal from "./CreateTicketModal";
 import { useTickets } from "../../hooks/api/useTickets";
 
 const variant = {
+  جدید: "danger",
+  "پاسخ داده شد": "success",
   باز: "danger",
   "در حال بررسی": "warning",
   بسته: "success",
@@ -57,7 +59,7 @@ function Tickets() {
   }
 
   const openTickets = tickets.filter(
-    (ticket) => ticket.status === "باز",
+    (ticket) => ticket.statusKey === "OPEN",
   ).length;
 
   const pendingTickets = tickets.filter(

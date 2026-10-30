@@ -65,3 +65,19 @@ export const reviewSubmitLimiter = rateLimit({
   message: { message: "تعداد نظرهای ارسالی شما زیاد بود. کمی بعد دوباره تلاش کنید." },
 });
 
+export const publicTicketSubmitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "تعداد درخواست‌های پشتیبانی زیاد است. کمی بعد دوباره تلاش کنید." },
+});
+
+export const publicTicketLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "تعداد تلاش‌های پیگیری زیاد است. کمی بعد دوباره تلاش کنید." },
+});
+

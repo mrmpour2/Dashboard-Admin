@@ -6,8 +6,8 @@ import useToast from "../../components/ui/Toast/ToastContext/useToast";
 import { useUsersQuery } from "../Users/hooks/useUsersQuery";
 import { useProductsQuery } from "../Products/hooks/useProductsQuery";
 import { useCreateOrderMutation } from "./hooks/useOrdersQuery";
+import { formatPrice } from "../../utils/formatPrice.js";
 
-const currencyFormatter = new Intl.NumberFormat("fa-IR");
 const emptyLine = () => ({ productId: "", quantity: 1 });
 
 function OrderForm() {
@@ -68,7 +68,7 @@ function OrderForm() {
       });
       if (order.discountAmount > 0) {
         toast.Success(
-          `سفارش ثبت شد — ${currencyFormatter.format(order.discountAmount)} تومان تخفیف اعمال شد`,
+          `سفارش ثبت شد — ${formatPrice(order.discountAmount)} تخفیف اعمال شد`,
         );
       } else {
         toast.Success("سفارش جدید با موفقیت ثبت شد");
@@ -123,7 +123,7 @@ function OrderForm() {
                 <option value="">انتخاب محصول...</option>
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
-                    {product.name} — {currencyFormatter.format(product.price)} ت
+                    {product.name} — {formatPrice(product.price)}
                   </option>
                 ))}
               </select>
@@ -151,7 +151,7 @@ function OrderForm() {
         <div className="flex items-center justify-between rounded-xl bg-SurfaceMuted px-4 py-3">
           <span className="text-sm text-textSecondary">مبلغ کل (تخمینی، پیش از تخفیف)</span>
           <span className="font-Outfit font-bold text-textPrimary">
-            {currencyFormatter.format(total)} تومان
+            {formatPrice(total)}
           </span>
         </div>
 

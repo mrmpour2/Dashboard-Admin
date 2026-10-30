@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { updateCartSnapshot } from "../controllers/cartController.js";
+import * as publicTicketController from "../controllers/publicTicketController.js";
+import * as faqController from "../controllers/faqController.js";
 import { getMenuItem, getMenuItemAddOns, listMenu } from "../controllers/publicMenuController.js";
 import {
   createPublicReview,
@@ -7,10 +9,12 @@ import {
   listTableTalk,
 } from "../controllers/reviewController.js";
 import { optionalClubMember } from "../middleware/clubAuth.js";
-import { cartLimiter, reviewSubmitLimiter } from "../middleware/rateLimiters.js";
+import { cartLimiter, reviewSubmitLimiter, publicTicketSubmitLimiter, publicTicketLookupLimiter } from "../middleware/rateLimiters.js";
 import { validate } from "../middleware/validate.js";
 import clubRoutes from "./clubRoutes.js";
 import { listPublicMenuSchema, publicMenuItemSchema } from "../validators/publicValidators.js";
+import { handleTicketUpload } from "../middleware/ticketUpload.js";
+import { createPublicTicketSchema, replyPublicTicketSchema, trackPublicTicketSchema } from "../validators/publicTicketValidators.js";
 import {
   createPublicReviewSchema,
   listPublicReviewsSchema,
@@ -20,6 +24,11 @@ import {
 const router = Router();
 
 router.post("/cart", cartLimiter, updateCartSnapshot);
+
+router.get("/faq", faqController.listPublicFaq);
+router.post("/tickets", publicTicketSubmitLimiter, handleTicketUpload, validate(createPublicTicketSchema), publicTicketController.createPublicTicket);
+router.post("/tickets/track", publicTicketLookupLimiter, validate(trackPublicTicketSchema), publicTicketController.trackPublicTicket);
+router.post("/tickets/reply", publicTicketSubmitLimiter, validate(replyPublicTicketSchema), publicTicketController.replyPublicTicket);
 
 // منوی عمومی وب‌سایت: بدون توکن، فقط خواندنی و با پاسخ کش‌شدنی.
 router.get("/menu", validate(listPublicMenuSchema), listMenu);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const statusEnum = z.enum(["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]);
+const siteOrderStatusEnum = z.enum(["PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]);
 
 export const listOrdersSchema = z.object({
   body: z.object({}).optional(),
@@ -44,4 +45,26 @@ export const updateOrderStatusSchema = z.object({
   body: z.object({
     status: statusEnum,
   }),
+});
+
+export const listSiteOrdersSchema = z.object({
+  body: z.object({}).optional(),
+  params: z.object({}).optional(),
+  query: z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    status: z.enum(["PENDING_PAYMENT", "RESERVED", "EXPIRED", "REFUND_PENDING", "REFUNDED", "CONFIRMED", "PAID", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]).optional(),
+  }),
+});
+
+export const updateSiteOrderStatusSchema = z.object({
+  query: z.object({}).optional(),
+  params: z.object({ id: z.string().cuid("شناسه سفارش نامعتبر است") }),
+  body: z.object({ status: siteOrderStatusEnum }),
+});
+
+export const siteOrderIdParamSchema = z.object({
+  query: z.object({}).optional(),
+  body: z.object({}).optional(),
+  params: z.object({ id: z.string().cuid("شناسه سفارش نامعتبر است") }),
 });

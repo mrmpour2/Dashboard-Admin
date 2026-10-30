@@ -9,7 +9,7 @@ export function normalizeUser(user) {
 }
 /** @param {Record<string, any>} ticket */
 export function normalizeTicket(ticket) {
-  return { ...ticket, subject: ticket.title ?? ticket.subject, customer: ticket.assignee?.name ?? ticket.customer ?? "تخصیص داده نشده", messages: ticket._count?.comments ?? ticket.comments?.length ?? 0, department: "پشتیبانی", priority: { HIGH: "بالا", MEDIUM: "متوسط", LOW: "پایین", URGENT: "فوری" }[ticket.priority] || ticket.priority, status: { OPEN: "باز", IN_PROGRESS: "در حال بررسی", RESOLVED: "حل‌شده", CLOSED: "بسته" }[ticket.status] || ticket.status, createdAt: ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("fa-IR") : "—" };
+  return { ...ticket, subject: ticket.title ?? ticket.subject, customer: ticket.customerName ?? ticket.assignee?.name ?? ticket.customer ?? "تخصیص داده نشده", messages: ticket.messages?.length ?? ticket._count?.comments ?? ticket.comments?.length ?? 0, department: ticket.category ?? "پشتیبانی", priority: { HIGH: "بالا", MEDIUM: "متوسط", LOW: "پایین", URGENT: "فوری" }[ticket.priority] || ticket.priority, statusKey: ticket.status, status: { OPEN: "جدید", IN_PROGRESS: "در حال بررسی", RESOLVED: "پاسخ داده شد", CLOSED: "بسته" }[ticket.status] || ticket.status, createdAt: ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("fa-IR") : "—" };
 }
 /** برچسب فارسی وضعیت‌های نظر مشتری. */
 const REVIEW_STATUS_LABELS = { PENDING: "در انتظار بررسی", APPROVED: "تأییدشده", REJECTED: "ردشده" };

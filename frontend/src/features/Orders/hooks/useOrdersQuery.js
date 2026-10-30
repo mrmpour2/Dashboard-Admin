@@ -4,6 +4,9 @@ import {
   fetchOrder,
   createOrder,
   updateOrderStatus,
+  fetchSiteOrders,
+  fetchSiteOrder,
+  updateSiteOrderStatus,
 } from "../../../services/api/ordersApi";
 import { productsKeys } from "../../Products/hooks/useProductsQuery";
 
@@ -55,6 +58,33 @@ export function useUpdateOrderStatusMutation() {
       // لغو سفارش موجودی را برمی‌گرداند، پس لیست محصولات هم باید تازه شود
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: productsKeys.all });
+    },
+  });
+}
+
+export function useSiteOrdersQuery(params = {}) {
+  return useQuery({
+    queryKey: [...ordersKeys.all, "site", params],
+    queryFn: () => fetchSiteOrders(params),
+    placeholderData: (previousData) => previousData,
+  });
+}
+
+export function useSiteOrderQuery(id) {
+  return useQuery({
+    queryKey: [...ordersKeys.all, "site-detail", id],
+    queryFn: () => fetchSiteOrder(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useUpdateSiteOrderStatusMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }) => updateSiteOrderStatus(id, status),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [...ordersKeys.all, "site"] });
+      queryClient.invalidateQueries({ queryKey: [...ordersKeys.all, "site-detail", variables.id] });
     },
   });
 }

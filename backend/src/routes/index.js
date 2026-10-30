@@ -11,6 +11,8 @@ import publicRoutes from "./publicRoutes.js";
 import chatRoutes from "./chatRoutes.js";
 import paymentRoutes from "./paymentRoutes.js";
 import paypingRoutes from "./paypingRoutes.js";
+import settingsRoutes from "./settingsRoutes.js";
+import faqRoutes from "./faqRoutes.js";
 import conversationRoutes from "./conversationRoutes.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -29,6 +31,8 @@ router.use("/products", productRoutes);
 router.use("/tickets", ticketRoutes);
 router.use("/comments", commentRoutes);
 router.use("/orders", orderRoutes);
+router.use("/settings", settingsRoutes);
+router.use("/faqs", faqRoutes);
 router.use("/coupons", couponRoutes);
 // نظرهای مشتریان (پنل مدیریت): تأیید، انتخاب برای Table Talk و حذف.
 router.use("/reviews", reviewRoutes);

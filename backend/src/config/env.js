@@ -60,6 +60,8 @@ const envSchema = z.object({
   SECURITY_PROVIDER_MODE: z
     .enum(["disabled", "mock", "sandbox", "production"])
     .default("mock"),
+  SMS_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  OTP_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   OTP_HASH_SECRET: z.string().default(""),
   // Cloudflare Turnstile secret. Empty = real captcha verification fails closed.
   TURNSTILE_SECRET_KEY: z.string().trim().default(""),

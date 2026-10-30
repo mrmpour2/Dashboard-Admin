@@ -15,6 +15,8 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/", validate(listTicketsSchema), ticketController.listTickets);
+router.get("/assignees", ticketController.listAssignees);
+router.get("/:id/attachment", validate(ticketIdParamSchema), ticketController.getTicketAttachment);
 router.get("/:id", validate(ticketIdParamSchema), ticketController.getTicket);
 router.post("/", validate(createTicketSchema), ticketController.createTicket);
 router.patch("/:id", validate(updateTicketSchema), ticketController.updateTicket);

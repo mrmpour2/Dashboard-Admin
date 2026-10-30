@@ -30,6 +30,7 @@ export const createTicketSchema = z.object({
     title: z.string().trim().min(3).max(200),
     description: z.string().trim().min(3).max(5000),
     priority: priorityEnum.default("MEDIUM"),
+    category: z.string().trim().min(2).max(80).optional(),
     assignedTo: z.string().cuid().optional(),
   }),
 });
@@ -44,6 +45,7 @@ export const updateTicketSchema = z.object({
       status: statusEnum.optional(),
       priority: priorityEnum.optional(),
       assignedTo: z.string().cuid().nullable().optional(),
+      category: z.string().trim().min(2).max(80).nullable().optional(),
     })
     .refine((data) => Object.keys(data).length > 0, {
       message: "حداقل یک فیلد برای بروزرسانی الزامی است",

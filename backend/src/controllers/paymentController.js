@@ -14,6 +14,7 @@ import {
 import { AppError } from "../utils/AppError.js";
 import crypto from "node:crypto";
 import { markCartConverted } from "../services/cartSnapshotService.js";
+import { queueOrderAdminSms } from "../services/orderNotificationService.js";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import {
@@ -505,7 +506,7 @@ export async function confirmCashOnDelivery(req, res, next) {
       if (!activeReservations)
         throw new BadRequestError("رزرو موجودی سفارش معتبر نیست.");
       await transitionReservations(tx, current.id, "consumed", "cod_confirmed");
-      return tx.chatOrder.update({
+      const confirmedOrder = await tx.chatOrder.update({
         where: { id: current.id },
         data: {
           status: "CONFIRMED",
@@ -513,6 +514,8 @@ export async function confirmCashOnDelivery(req, res, next) {
           expiresAt: null,
         },
       });
+      await queueOrderAdminSms(tx, confirmedOrder.id);
+      return confirmedOrder;
     });
     res.json({
       order: {

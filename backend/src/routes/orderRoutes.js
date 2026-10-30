@@ -6,6 +6,9 @@ import {
   orderIdParamSchema,
   createOrderSchema,
   updateOrderStatusSchema,
+  listSiteOrdersSchema,
+  siteOrderIdParamSchema,
+  updateSiteOrderStatusSchema,
 } from "../validators/orderValidators.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 
@@ -15,6 +18,14 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/", validate(listOrdersSchema), orderController.listOrders);
+router.get("/site", validate(listSiteOrdersSchema), orderController.listSiteOrders);
+router.get("/site/:id", validate(siteOrderIdParamSchema), orderController.getSiteOrder);
+router.patch(
+  "/site/:id/status",
+  requireRole("ADMIN", "MANAGER"),
+  validate(updateSiteOrderStatusSchema),
+  orderController.updateSiteOrderStatus,
+);
 router.get("/:id", validate(orderIdParamSchema), orderController.getOrder);
 
 // ثبت سفارش با اعتبارسنجی ورودی
