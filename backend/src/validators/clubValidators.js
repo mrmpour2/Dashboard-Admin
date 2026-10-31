@@ -19,6 +19,9 @@ export const joinClubSchema = z.object({
     name: z.string().trim().min(2, "نام باید حداقل ۲ نویسه باشد.").max(60),
     phone,
     pin,
+    birthDate: z.string().date().optional(),
+    termsAccepted: z.literal(true),
+    marketingConsent: z.boolean().default(false),
     captchaToken: z.string().max(2048).optional(),
   }),
 });

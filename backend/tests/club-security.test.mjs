@@ -83,7 +83,7 @@ test("SEC-006: verified phone ownership and quarantined points", async t => {
       const observed = [];
       for (const phone of [member.phone, "09120000004"]) {
         const begin = performance.now();
-        const response = await fetch(`${base}/join`, { method: "POST", headers: { "Content-Type": "application/json", Origin: "http://localhost:5174", "X-Forwarded-For": `192.0.2.${++n}` }, body: JSON.stringify({ phone, name: "Test member", pin: "1234" }) });
+        const response = await fetch(`${base}/join`, { method: "POST", headers: { "Content-Type": "application/json", Origin: "http://localhost:5174", "X-Forwarded-For": `192.0.2.${++n}` }, body: JSON.stringify({ phone, name: "Test member", pin: "1234", termsAccepted: true }) });
         assert.equal(response.status, 202);
         const data = await response.json();
         assert.equal(data.member, undefined);

@@ -15,6 +15,7 @@ import settingsRoutes from "./settingsRoutes.js";
 import faqRoutes from "./faqRoutes.js";
 import conversationRoutes from "./conversationRoutes.js";
 import { requireAuth } from "../middleware/auth.js";
+import clubAdminRoutes from "./clubAdminRoutes.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { getDashboard } from "../services/dashboardService.js";
 
@@ -35,6 +36,7 @@ router.use("/settings", settingsRoutes);
 router.use("/faqs", faqRoutes);
 router.use("/coupons", couponRoutes);
 // نظرهای مشتریان (پنل مدیریت): تأیید، انتخاب برای Table Talk و حذف.
+router.use("/club-admin", clubAdminRoutes);
 router.use("/reviews", reviewRoutes);
 // مسیرهای عمومی وب‌سایت (بدون توکن) — عمداً جدا از مسیرهای محافظت‌شده پنل
 // نگه داشته می‌شوند تا قفل‌شدن API ادمین، منوی عمومی را از کار نیندازد.

@@ -23,6 +23,8 @@ const Router = createBrowserRouter([
               { path: "users", lazy: page(() => import("../features/Users/Users")) },
               { path: "coupons", lazy: page(() => import("../features/Coupons/Coupons")) },
               { path: "faqs", lazy: page(() => import("../features/Faq/Faqs")) },
+              { path: "club-members", lazy: page(() => import("../features/Club/ClubMembers")) },
+              { path: "club-nonmembers", lazy: page(() => import("../features/Club/NonMembers")) },
             ],
           },
           { path: "orders", lazy: page(() => import("../features/Orders/Orders")) },

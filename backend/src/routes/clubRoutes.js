@@ -4,6 +4,9 @@ import { clawbackClubPoints } from "../services/clubOwnershipService.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { z } from "zod";
 import { requireClubMember } from "../middleware/clubAuth.js";
+import { setMarketingConsent } from "../services/clubAdminService.js";
+import { prisma } from "../config/prisma.js";
+import { digest, securityAudit } from "../services/otpService.js";
 import { authLimiter, clubRedeemLimiter } from "../middleware/rateLimiters.js";
 import { validate } from "../middleware/validate.js";
 import {
@@ -32,6 +35,21 @@ router.post("/login", authLimiter, validate(loginClubSchema), login);
 router.post("/logout", validate(clubEmptySchema), logout);
 
 router.get("/me", requireClubMember, me);
+router.patch("/me/marketing-consent", requireClubMember, async (req, res, next) => {
+  try { const body = z.object({ allowed: z.boolean() }).parse(req.body); res.json(await setMarketingConsent(req.clubMember.id, body.allowed, { id: req.clubMember.id, role: "MEMBER" }, "member_settings")); } catch (error) { next(error); }
+});
+router.delete("/me", requireClubMember, async (req, res, next) => {
+  try {
+    const member = req.clubMember;
+    await prisma.$transaction(async tx => {
+      await tx.clubMember.update({ where: { id: member.id }, data: { isActive: false, marketingConsent: false, tokenVersion: { increment: 1 } } });
+      await tx.clubClaim.updateMany({ where: { memberId: member.id, status: "verified" }, data: { status: "cancelled" } });
+      await tx.customerMarketingConsent.upsert({ where: { phoneHash: digest(member.phone) }, create: { phoneHash: digest(member.phone), marketingAllowed: false, source: "member_cancellation" }, update: { marketingAllowed: false, consentAt: null, source: "member_cancellation" } });
+      await securityAudit(tx, "club.membership.cancelled", member.id, { memberId: member.id });
+    });
+    res.status(204).end();
+  } catch (error) { next(error); }
+});
 router.post(
   "/rewards/:rewardId/redeem",
   requireClubMember,

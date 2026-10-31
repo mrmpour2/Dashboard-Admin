@@ -117,6 +117,8 @@ export function toMemberView(member) {
     id: member.id,
     name: member.name,
     phone: member.phone,
+    birthDate: member.birthDate instanceof Date ? member.birthDate.toISOString().slice(0, 10) : member.birthDate ?? null,
+    marketingConsent: Boolean(member.marketingConsent),
     points: member.verificationStatus === "verified" ? member.pointsBalance : 0,
     verificationStatus: member.verificationStatus,
     verifiedPhone: member.verifiedPhone,
@@ -205,7 +207,7 @@ export async function loginClub({ phone, pin }) {
 
   const member = await prisma.clubMember.findUnique({ where: { phone: normalizedPhone } });
   if (!member) throw new UnauthorizedError("شماره موبایل یا رمز عضویت درست نیست.");
-  const valid = await comparePassword(normalizedPin, member.pinHash);
+  const valid = member?.isActive && await comparePassword(normalizedPin, member.pinHash);
   if (!valid) throw new UnauthorizedError("شماره موبایل یا رمز عضویت درست نیست.");
 
   return prisma.clubMember.update({

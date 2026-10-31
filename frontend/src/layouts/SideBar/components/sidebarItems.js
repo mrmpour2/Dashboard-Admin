@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Users, Ticket, MessageSquare, ShoppingBag, Tags, CircleHelp, Settings } from "lucide-react";
+import { LayoutDashboard, Package, Users, Ticket, MessageSquare, ShoppingBag, Tags, CircleHelp, Settings, UserRoundCheck } from "lucide-react";
 
 export const sidebarItems = [
   { title: "داشبورد", path: "/", icon: LayoutDashboard },
@@ -6,6 +6,8 @@ export const sidebarItems = [
   { title: "سفارش‌ها", path: "/orders", icon: ShoppingBag },
   { title: "کدهای تخفیف", path: "/coupons", icon: Tags, roles: ["ADMIN", "MANAGER"] },
   { title: "کاربران", path: "/users", icon: Users, roles: ["ADMIN", "MANAGER"] },
+  { title: "باشگاه مشتریان", path: "/club-members", icon: UserRoundCheck, roles: ["ADMIN", "MANAGER"] },
+  { title: "مشتریان غیرعضو", path: "/club-nonmembers", icon: Users, roles: ["ADMIN", "MANAGER"] },
   { title: "پرسش‌های متداول", path: "/faqs", icon: CircleHelp, roles: ["ADMIN", "MANAGER"] },
   { title: "تیکت ها", path: "/tickets", icon: Ticket },
   { title: "نظرهای مشتریان", path: "/comments", icon: MessageSquare },

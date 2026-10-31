@@ -72,9 +72,15 @@ test("Club API awards, redeems and protects points", async (t) => {
         status: 400,
       });
 
+      await request("/public/club/join", {
+        method: "POST",
+        body: { name: "عضو آزمایشی", phone: "09123456788", pin: "1234" },
+        status: 400,
+      });
+
       const pending = await request("/public/club/join", {
         method: "POST",
-        body: { name: "مهمان آزمایشی", phone: "۰۹۱۲ ۳۴۵ ۶۷۸۹", pin: "۱۲۳۴" },
+        body: { name: "مهمان آزمایشی", phone: "۰۹۱۲ ۳۴۵ ۶۷۸۹", pin: "۱۲۳۴", termsAccepted: true, birthDate: "1990-05-14" },
         status: 202,
       });
       assert.equal(pending.data.member, undefined);
@@ -84,6 +90,9 @@ test("Club API awards, redeems and protects points", async (t) => {
       });
       member = data.member;
       assert.equal(member.phone, "09123456789");
+      const savedMember = await prisma.clubMember.findUnique({ where: { id: member.id } });
+      assert.equal(savedMember.marketingConsent, false);
+      assert.equal(savedMember.birthDate.toISOString().slice(0, 10), "1990-05-14");
       assert.equal(member.points, 0);
       assert.equal(member.tier.id, "bronze");
 
