@@ -9,11 +9,9 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
   const fixture = await createFixture();
   const { prisma } = await import("../src/config/prisma.js");
   const payments = await import("../src/controllers/paymentController.js");
-  const paypingController = await import("../src/controllers/paypingController.js");
   const stock = await import("../src/services/stockService.js");
   const otp = await import("../src/services/otpService.js");
   const providers = await import("../src/services/securityProviders.js");
-  const { processSecurityOutbox } = await import("../src/services/securityJobs.js");
   const { env } = await import("../src/config/env.js");
   const nativeFetch = globalThis.fetch;
   const results = [];
@@ -25,10 +23,10 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
     return { error, data, status };
   }
   async function item(stockCount = 1) { return prisma.product.create({ data: { name: "Security test", price: 10000, stock: stockCount } }); }
-  function request(product, { phone, ip, key, quantity = 1 } = {}) {
+  function request(product, { phone, ip, key, quantity = 1, selectedOptionIds = [] } = {}) {
     n++;
     phone ??= "0912" + String(n).padStart(7, "0");
-    return { body: { customerName: "Synthetic guest", customerPhone: phone, shippingAddress: "Disposable test address", items: [{ productId: product.id, quantity }] },
+    return { body: { customerName: "Synthetic guest", customerPhone: phone, shippingAddress: "Disposable test address", items: [{ productId: product.id, quantity, ...(selectedOptionIds.length ? { selectedOptionIds } : null) }] },
       checkoutPhone: phone, ip: ip ?? `192.0.2.${n}`, headers: { "idempotency-key": key ?? randomUUID() } };
   }
   async function create(product, options) {
@@ -41,23 +39,7 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
     await prisma.stockReservation.updateMany({ where: { orderId: order.id }, data: { expiresAt: new Date(0) } });
     return stock.releaseExpired({ dryRun: false });
   }
-  async function payment(order, method = "PAYPING") {
-    return prisma.chatPayment.create({ data: { orderId: order.id, method, status: method === "PAYPING" ? "PENDING" : "PENDING_REVIEW", amountToman: 10000, amountRial: 100000n,
-      ...(method === "PAYPING" ? { paypingPaymentCode: String(++n) } : {}) } });
-  }
-  // Simulates the browser returning from PayPing: callback -> server-side verify (mocked) -> finalize.
-  // `override` changes what the callback payload claims (a tampered/mismatched return).
-  async function verify(p, order, override = {}) {
-    const claim = { paymentCode: p.paypingPaymentCode, paymentRefId: "MOCK-REF", amount: 10000, clientRefId: order.orderNumber, ...override };
-    globalThis.fetch = async () => new Response(JSON.stringify({ amount: 10000, clientRefId: order.orderNumber }), { status: 200 });
-    let location = "";
-    const req = { body: { status: "1", data: claim }, query: {}, log: { error() {} } };
-    await paypingController.payPingCallback(req, { redirect(_code, url) { location = url; } });
-    const outcome = new URL(location, "http://x").searchParams.get("payment");
-    return { error: outcome === "failed" ? { statusCode: 400 } : undefined, data: { verified: outcome === "success", refundPending: outcome === "refund_pending" }, outcome };
-  }
   try {
-    env.PAYPING_TOKEN = "mock-only";
     await check("backfill dry-run preserves data, apply reconstructs legacy on_hand and rerun is idempotent", async () => {
       const product = await item(0);
       await prisma.productStock.delete({ where: { skuId: product.id } });
@@ -93,48 +75,14 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
       const changed = structuredClone(req); changed.body.items[0].quantity = 2;
       assert.equal((await invoke(payments.createChatOrder, changed)).error.code, "IDEMPOTENCY_CONFLICT");
     });
-    await check("duplicate verified callbacks consume once", async () => {
-      const product = await item(); const { order } = await create(product), p = await payment(order);
-      const results = await Promise.all([verify(p, order), verify(p, order)]);
-      assert.ok(results.every(r => !r.error), results.map(r => r.error?.stack).join("\n"));
-      const s = await prisma.productStock.findUnique({ where: { skuId: product.id } });
-      assert.equal(s.onHand, 0); assert.equal(s.reserved, 0);
-      assert.equal((await prisma.chatOrder.findUnique({ where: { id: order.id } })).status, "CONFIRMED");
-    });
-    await check("late verified payment re-reserves available stock", async () => {
-      const product = await item(); const { order } = await create(product), p = await payment(order); await expire(order);
-      const result = await verify(p, order); assert.equal(result.error, undefined); assert.equal(result.data.verified, true);
-      assert.equal((await prisma.productStock.findUnique({ where: { skuId: product.id } })).onHand, 0);
-    });
-    await check("mismatched verified amount or order identity never consumes inventory", async () => {
-      const product = await item(); const { order } = await create(product), p = await payment(order);
-      for (const fields of [{ clientRefId: "another-order" }, { amount: 9999 }]) {
-        const r = await verify(p, order, fields);
-        assert.equal(r.error?.statusCode, 400);
-        const inventory = await prisma.productStock.findUnique({ where: { skuId: product.id } });
-        assert.equal(inventory.onHand, 1); assert.equal(inventory.reserved, 1);
-      }
-    });
-    await check("late verified payment without stock creates one mock refund, notification and ticket", async () => {
-      const product = await item(); const { order } = await create(product), p = await payment(order); await expire(order);
-      await prisma.$transaction(tx => stock.recordStaffSale(tx, "synthetic-sale", [{ productId: product.id, quantity: 1 }]));
-      const result = await verify(p, order); assert.equal(result.error, undefined); assert.equal(result.data.refundPending, true);
-      assert.equal(await prisma.securityOutbox.count({ where: { paymentId: p.id } }), 3);
-      await Promise.all([processSecurityOutbox({ dryRun: false }), processSecurityOutbox({ dryRun: false })]);
-      assert.equal(providers.mockRefunds.size, 1);
-      assert.equal((await prisma.chatPayment.findUnique({ where: { id: p.id } })).status, "REFUNDED");
-      assert.equal(await prisma.ticket.count({ where: { title: "بررسی پرداخت و موجودی", description: { contains: p.id } } }), 1);
-      await verify(p, order);
-      assert.equal(await prisma.securityOutbox.count({ where: { paymentId: p.id } }), 3);
-      assert.equal(providers.mockRefunds.size, 1);
-    });
     await check("late card receipt without stock is rejected with manual-review ticket", async () => {
-      const product = await item(); const { order } = await create(product), p = await payment(order, "CARD_TO_CARD"); await expire(order);
+      const product = await item(); const { order } = await create(product);
+      const p = await prisma.chatPayment.create({ data: { orderId: order.id, method: "CARD_TO_CARD", status: "PENDING_REVIEW", amountToman: 10000, amountRial: 100000n } });
+      await expire(order);
       await prisma.$transaction(tx => stock.recordStaffSale(tx, "synthetic-card-sale", [{ productId: product.id, quantity: 1 }]));
       const r = await invoke(payments.reviewCardToCardReceipt, { params: { paymentId: p.id }, body: { decision: "approve" }, user: fixture.admin });
       assert.equal(r.error, undefined); assert.equal(r.data.payment.status, "REJECTED");
-    });
-    await check("cancellation releases rather than expires and is idempotent", async () => {
+    });    await check("cancellation releases rather than expires and is idempotent", async () => {
       const product = await item(); const { order } = await create(product);
       await Promise.all([stock.cancelChatOrder(order.id), stock.cancelChatOrder(order.id)]);
       assert.equal((await prisma.stockReservation.findFirst({ where: { orderId: order.id } })).status, "released");
@@ -168,6 +116,19 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
       const server = app.listen(0, "127.0.0.1"); await new Promise(r => server.once("listening", r));
       try { const response = await nativeFetch(`http://127.0.0.1:${server.address().port}/api/payment/orders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); assert.equal(response.status, 401); }
       finally { await new Promise(r => server.close(r)); }
+    });
+    await check("custom options are validated, priced from the database, and snapshotted", async () => {
+      const product = await item(2);
+      const otherProduct = await item(2);
+      const option = await prisma.productOption.create({ data: { productId: product.id, label: "Extra cheese", labelEn: "Extra cheese", priceDelta: 1200, sortOrder: 0 } });
+      const foreignOption = await prisma.productOption.create({ data: { productId: otherProduct.id, label: "Foreign", priceDelta: 5000 } });
+      const disabledOption = await prisma.productOption.create({ data: { productId: product.id, label: "Disabled", priceDelta: 9000, isActive: false } });
+      const { order } = await create(product, { selectedOptionIds: [option.id] });
+      assert.equal(order.items[0].unitPrice, 11200);
+      assert.deepEqual(order.items[0].selectedOptions, [{ id: option.id, label: "Extra cheese", labelEn: "Extra cheese", priceDelta: 1200 }]);
+      assert.equal(order.totalAmount, 112320);
+      assert.equal((await invoke(payments.createChatOrder, request(product, { selectedOptionIds: [foreignOption.id] }))).error.statusCode, 400);
+      assert.equal((await invoke(payments.createChatOrder, request(product, { selectedOptionIds: [disabledOption.id] }))).error.statusCode, 400);
     });
     await check("database prevents negative stock and audit modification", async () => {
       const product = await item();

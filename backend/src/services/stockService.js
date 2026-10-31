@@ -36,9 +36,7 @@ export function buildNoStockRefundPayload(payment) {
     amountRial,
     currency: "TOMAN",
     reason: "verified_payment_without_stock",
-    gatewayMethod: payment.method ?? null,
-    gatewayRef:
-      payment.paypingPaymentRefId ?? payment.legacyGatewayTrackId ?? null,
+    gatewayRef: null,
   };
 }
 
@@ -163,7 +161,7 @@ export async function enforceGuestLimits(tx, phoneHash, ipHash, now) {
     );
   }
 }
-export async function cancelChatOrder(orderId) {
+export async function cancelChatOrder(orderId, { actorId } = {}) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM chat_orders WHERE id=${orderId} FOR UPDATE`;
     const order = await tx.chatOrder.findUnique({ where: { id: orderId } });
@@ -172,10 +170,19 @@ export async function cancelChatOrder(orderId) {
     if (![...activeOrderStatuses, "EXPIRED"].includes(order.status))
       throw new BadRequestError("این سفارش قابل لغو نیست.");
     await transitionReservations(tx, orderId, "released", "user_cancelled");
-    return tx.chatOrder.update({
+    const cancelled = await tx.chatOrder.update({
       where: { id: orderId },
       data: { status: "CANCELLED" },
     });
+    if (order.couponCode) await tx.coupon.updateMany({ where: { code: order.couponCode, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+    if (actorId) {
+      await securityAudit(tx, "order.site.status_changed", orderId, {
+        actorId,
+        from: order.status,
+        to: "CANCELLED",
+      });
+    }
+    return cancelled;
   });
 }
 export async function finalizeVerifiedPayment(

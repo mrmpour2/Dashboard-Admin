@@ -12,6 +12,7 @@ import { logger } from "./config/logger.js";
 import apiRoutes from "./routes/index.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { generalLimiter } from "./middleware/rateLimiters.js";
+import { productUploadsDirectory } from "./middleware/upload.js";
 
 const app = express();
 
@@ -55,7 +56,7 @@ const corsMiddleware = cors({
 // بازگشت از درگاه پرداخت یک ناوبری مرورگر از دامنهٔ درگاه است (نه فراخوانی
 // cross-origin اسکریپت)؛ مرورگر Origin درگاه را می‌فرستد و CORS نباید آن را رد کند.
 // اعتبار این مسیر با verify سمت سرور به درگاه تضمین می‌شود، نه با CORS.
-const CORS_EXEMPT_PATHS = new Set(["/api/payment/payping/callback"]);
+const CORS_EXEMPT_PATHS = new Set();
 app.use((req, res, next) =>
   CORS_EXEMPT_PATHS.has(req.path) ? next() : corsMiddleware(req, res, next),
 );
@@ -67,6 +68,8 @@ app.use(cookieParser());
 
 // جلوگیری از HTTP Parameter Pollution (مثل ?role=ADMIN&role=STAFF)
 app.use(hpp());
+
+app.use("/uploads/products", express.static(productUploadsDirectory, { acceptRanges: true, dotfiles: "deny", index: false, immutable: true, maxAge: "1y" }));
 
 app.use(pinoHttp({ logger }));
 

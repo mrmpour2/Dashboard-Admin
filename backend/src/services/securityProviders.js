@@ -219,12 +219,10 @@ function getSmsClient() {
 export function assertSecurityProvidersConfig() {
   if (mockAllowed()) return;
   const missing = [];
-  for (const key of [
-    "SMSIR_API_KEY",
-    "SMSIR_LINE_NUMBER",
-    "SMSIR_TEMPLATE_ID",
-    "TURNSTILE_SECRET_KEY",
-  ]) {
+  const required = ["TURNSTILE_SECRET_KEY"];
+  if (env.SMS_ENABLED || env.OTP_ENABLED) required.push("SMSIR_API_KEY", "SMSIR_LINE_NUMBER");
+  if (env.OTP_ENABLED) required.push("SMSIR_TEMPLATE_ID");
+  for (const key of required) {
     if (isMissing(env[key])) missing.push(key);
   }
   if (missing.length) {
@@ -253,6 +251,10 @@ export const securityProviders = {
     if (mockAllowed()) {
       pushMockDelivery(message);
       return true;
+    }
+
+    if (!env.OTP_ENABLED) {
+      throw new NotificationNotDeliveredError("سرویس پیامک OTP غیرفعال است.");
     }
 
     const phone = normalizeIranMobile(message?.phone);
@@ -303,6 +305,49 @@ export const securityProviders = {
       throw new ServiceUnavailableError("ارسال پیامک ناموفق بود.");
     }
     return true;
+  },
+
+  /**
+   * Provider-neutral transactional SMS interface. Production delivery is
+   * disabled unless the SMS feature flag and provider credentials are configured.
+   */
+  async sendSms(message) {
+    if (overrides.sendSms) return overrides.sendSms(message);
+    if (mockAllowed()) {
+      pushMockDelivery({ ...message, type: "sms" });
+      return { delivered: true, mock: true };
+    }
+    if (!env.SMS_ENABLED) {
+      throw new NotificationNotDeliveredError("سرویس پیامک غیرفعال است.");
+    }
+    const phone = normalizeIranMobile(message?.phone);
+    const text = String(message?.message ?? "").trim();
+    if (!phone || !text || text.length > 500) {
+      throw new InvalidProviderInputError("Invalid SMS message");
+    }
+    if (isMissing(env.SMSIR_API_KEY) || !Number.isInteger(Number(env.SMSIR_LINE_NUMBER))) {
+      log.error({ provider: "smsir" }, "sms provider is not configured");
+      throw new NotificationNotDeliveredError("SMS provider is not configured.");
+    }
+    try {
+      const response = await withTimeout(
+        getSmsClient().SendBulk(text, [phone]),
+        SMS_TIMEOUT_MS,
+        "smsir",
+      );
+      const result = response?.data ?? response;
+      if (result?.status !== 1) {
+        log.error({ provider: "smsir", phone: maskPhone(phone), providerMessage: safeText(result?.message) }, "sms rejected by provider");
+        throw new NotificationNotDeliveredError("SMS delivery was rejected.");
+      }
+      return { delivered: true };
+    } catch (err) {
+      if (err instanceof NotificationNotDeliveredError) throw err;
+      log.error({ provider: "smsir", phone: maskPhone(phone), err: errMsg(err) }, "sms send failed");
+      // Delivery may be ambiguous after timeout/network failure; do not retry
+      // automatically because SMS.ir bulk sends do not accept an idempotency key.
+      throw new NotificationNotDeliveredError("SMS delivery could not be confirmed.");
+    }
   },
 
   /**

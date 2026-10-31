@@ -55,7 +55,7 @@ const payment = (extra = {}) => ({
   id: "pay_1",
   orderId: "order_1",
   amountToman: 185000,
-  method: "PAYPING",
+  method: "DARGAH",
   ...extra,
 });
 
@@ -71,14 +71,13 @@ test("toRial converts Toman to Rial and rejects bad amounts", () => {
 
 test("refund payload carries Rial amount and the gateway ref, never the internal id as ref", () => {
   const p = buildNoStockRefundPayload(
-    payment({ paypingPaymentRefId: "pp-123" }),
+    payment(),
   );
   assert.equal(p.paymentId, "pay_1");
   assert.equal(p.amountToman, 185000);
   assert.equal(p.amountRial, 1_850_000);
   assert.equal(p.currency, "TOMAN");
-  assert.equal(p.gatewayMethod, "PAYPING");
-  assert.equal(p.gatewayRef, "pp-123");
+  assert.equal(p.gatewayRef, null);
   assert.notEqual(p.gatewayRef, p.paymentId);
   assert.equal(p.amount, undefined); // ambiguous legacy key must stay gone
 });
@@ -97,7 +96,7 @@ test("no stock -> REFUND_PENDING with refund/notification/ticket outbox rows", a
   const { tx, outbox } = fakeTx({ available: 0 });
   const result = await finalizeVerifiedPayment(
     tx,
-    payment({ paypingPaymentRefId: "pp-123" }),
+    payment(),
   );
   assert.equal(result.status, "REFUND_PENDING");
   assert.deepEqual(outbox.map((r) => r.kind).sort(), [
@@ -107,7 +106,7 @@ test("no stock -> REFUND_PENDING with refund/notification/ticket outbox rows", a
   ]);
   const refund = outbox.find((r) => r.kind === "refund");
   assert.equal(refund.payload.amountRial, 1_850_000);
-  assert.equal(refund.payload.gatewayRef, "pp-123");
+  assert.equal(refund.payload.gatewayRef, null);
 });
 
 test("stock available -> PAID and no refund rows", async () => {
@@ -137,7 +136,7 @@ test("contract: outbox refund payload has exactly what the provider validates (p
   // In test/dev the provider uses its mock and skips validation, so assert the validated
   // fields directly (same checks as securityProviders.refund) and that the request round-trips.
   const { tx, outbox } = fakeTx({ available: 0 });
-  await finalizeVerifiedPayment(tx, payment({ paypingPaymentRefId: "pp-123" }));
+  await finalizeVerifiedPayment(tx, payment());
   const refund = outbox.find((r) => r.kind === "refund");
   const request = {
     ...refund.payload,

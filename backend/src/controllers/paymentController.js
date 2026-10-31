@@ -15,6 +15,7 @@ import { AppError } from "../utils/AppError.js";
 import crypto from "node:crypto";
 import { markCartConverted } from "../services/cartSnapshotService.js";
 import { queueOrderAdminSms } from "../services/orderNotificationService.js";
+import { resolveCouponForOrder } from "../services/couponService.js";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import {
@@ -151,6 +152,9 @@ export async function createChatOrder(req, res, next) {
           ? null
           : String(item.variantId),
       quantity: Number(item.quantity),
+      selectedOptionIds: Array.isArray(item.selectedOptionIds)
+        ? item.selectedOptionIds.map((id) => String(id))
+        : [],
       // ردیف مخلفات: اشاره به قلم اصلی همان درخواست (شناسه محصول + سایز). سایت
       // این فیلد را فقط برای مخلفات می‌فرستد؛ `null` یعنی قلم مستقل است.
       parent:
@@ -278,6 +282,10 @@ export async function createChatOrder(req, res, next) {
               where: { isActive: true },
               select: { id: true, label: true, price: true },
             },
+            customOptions: {
+              where: { isActive: true },
+              select: { id: true, label: true, labelEn: true, priceDelta: true },
+            },
           },
         });
         const productMap = new Map(
@@ -327,6 +335,25 @@ export async function createChatOrder(req, res, next) {
           };
         });
 
+        for (const line of lines) {
+          const product = productMap.get(line.productId);
+          const optionById = new Map(product.customOptions.map((option) => [option.id, option]));
+          const selectedOptions = line.selectedOptionIds.map((id) => optionById.get(id));
+          if (selectedOptions.some((option) => !option)) {
+            throw new BadRequestError(`Ø§ÙØ²ÙˆØ¯Ù†ÛŒ Ø§Ù†ØªØ®Ø§Ø¨â€ŒØ´Ø¯Ù‡ Ø¨Ø±Ø§ÛŒ ${product.name} Ù†Ø§Ù…Ø¹ØªØ¨Ø¨Ø± ÛŒØ§ ØºÛŒØ±ÙØ¹Ø§Ù„ Ø§Ø³Øª.`);
+          }
+          line.selectedOptions = selectedOptions.map((option) => ({
+            id: option.id,
+            label: option.label,
+            labelEn: option.labelEn,
+            priceDelta: Number(option.priceDelta),
+          }));
+          line.unitPrice = Number(line.unitPrice) + selectedOptions.reduce(
+            (sum, option) => sum + Number(option.priceDelta),
+            0,
+          );
+        }
+
         // مخلفات فقط وقتی پذیرفته می‌شود که برای همان غذای اصلی در پنل تعریف شده
         // باشد؛ این‌طور شناسه نامرتبط یا دستکاری‌شده نمی‌تواند به سفارش برسد.
         const addOnLines = lines.filter((line) => line.parent);
@@ -360,9 +387,20 @@ export async function createChatOrder(req, res, next) {
         );
         if (!Number.isSafeInteger(Math.round(subtotal)) || subtotal <= 0)
           throw new BadRequestError("مبلغ سفارش معتبر نیست.");
+        let coupon = null;
+        let discountAmount = 0;
+        if (req.body.couponCode) {
+          const member = await tx.clubMember.findUnique({ where: { phone }, select: { id: true, isActive: true } });
+          const resolved = await resolveCouponForOrder(req.body.couponCode, subtotal, tx, { clubMemberId: member?.isActive ? member.id : null });
+          coupon = resolved.coupon;
+          discountAmount = resolved.discountAmount;
+          const updated = await tx.coupon.updateMany({ where: { id: coupon.id, isActive: true, ...(coupon.maxUses === null ? {} : { usedCount: { lt: coupon.maxUses } }) }, data: { usedCount: { increment: 1 } } });
+          if (updated.count !== 1) throw new BadRequestError("Coupon can no longer be used.");
+        }
         const deliveryFeeAmount = env.DELIVERY_FEE_TOMAN;
-        const taxAmount = Math.round((subtotal * env.VAT_RATE_BPS) / 10000);
-        const totalAmount = subtotal + deliveryFeeAmount + taxAmount;
+        const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+        const taxAmount = Math.round((discountedSubtotal * env.VAT_RATE_BPS) / 10000);
+        const totalAmount = discountedSubtotal + deliveryFeeAmount + taxAmount;
         if (!Number.isSafeInteger(totalAmount))
           throw new BadRequestError("مبلغ نهایی سفارش معتبر نیست.");
         const created = await tx.chatOrder.create({
@@ -371,6 +409,10 @@ export async function createChatOrder(req, res, next) {
             conversationId,
             customerName: customerName.trim(),
             customerPhone: phone,
+            couponCode: coupon?.code ?? null,
+            discountAmount,
+            marketingConsent: req.body.marketingConsent === true,
+            marketingConsentAt: req.body.marketingConsent === true ? now : null,
             phoneHash,
             ipHash,
             idempotencyKey,
@@ -379,12 +421,16 @@ export async function createChatOrder(req, res, next) {
             status: "RESERVED",
             customerEmail: customerEmail?.trim() || null,
             shippingAddress: shippingAddress.trim(),
-            subtotalAmount: subtotal,
+            subtotalAmount: discountedSubtotal,
             deliveryFeeAmount,
             taxAmount,
             totalAmount,
           },
         });
+        if (req.body.marketingConsent === true) {
+          await tx.customerMarketingConsent.upsert({ where: { phoneHash }, create: { phoneHash, marketingAllowed: true, consentAt: now, source: "website_checkout" }, update: { marketingAllowed: true, consentAt: now, source: "website_checkout" } });
+          await tx.clubMember.updateMany({ where: { phone, isActive: true }, data: { marketingConsent: true, marketingConsentAt: now, marketingConsentSource: "website_checkout" } });
+        }
         await markCartConverted(tx, sessionId, now);
 
         // ردیف‌ها یکی‌یکی ساخته می‌شوند تا شناسه ردیف اصلی در دست باشد و ردیف
@@ -399,6 +445,7 @@ export async function createChatOrder(req, res, next) {
               variantLabel: line.variantLabel,
               quantity: line.quantity,
               unitPrice: line.unitPrice,
+              selectedOptions: line.selectedOptions,
             },
           });
           itemIdByLineKey.set(lineKey(line), row.id);
@@ -413,6 +460,7 @@ export async function createChatOrder(req, res, next) {
               variantLabel: line.variantLabel,
               quantity: line.quantity,
               unitPrice: line.unitPrice,
+              selectedOptions: line.selectedOptions,
             },
           });
         }
@@ -450,6 +498,7 @@ export async function createChatOrder(req, res, next) {
           unitPrice: moneyToNumber(item.unitPrice),
           imageUrl: item.product.imageUrl,
           variantLabel: item.variantLabel ?? null,
+          selectedOptions: item.selectedOptions,
           parentKey: item.parentItem
             ? `${item.parentItem.productId}::${item.parentItem.variantId ?? ""}`
             : null,

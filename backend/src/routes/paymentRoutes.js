@@ -16,12 +16,15 @@ const orderSchema = z.object({ params: empty, query: empty, body: z.object({
   sessionId: z.string().trim().min(20).max(100).regex(/^[\w-]+$/).optional(),
   customerName: z.string().trim().min(2).max(120),
   customerPhone: z.string().trim().min(8).max(20),
+  marketingConsent: z.boolean().optional().default(false),
+  couponCode: z.string().trim().max(40).optional(),
   customerEmail: z.string().trim().email().max(254).optional().or(z.literal("")),
   shippingAddress: z.string().trim().min(5).max(2000),
   items: z.array(z.object({
     productId: z.string().min(1).max(100),
     // سایز/واریانت انتخاب‌شده (مثل پیتزای شش‌نفره)؛ اختیاری است.
     variantId: z.string().min(1).max(100).optional(),
+    selectedOptionIds: z.array(z.string().cuid()).max(12).refine((ids) => new Set(ids).size === ids.length).optional(),
     quantity: z.coerce.number().int().min(1).max(50),
     // مخلفات: اشاره به قلم اصلی همین سفارش (شناسه محصول + سایز). سرور بررسی
     // می‌کند که این محصول برای آن قلم در پنل تعریف شده باشد.
