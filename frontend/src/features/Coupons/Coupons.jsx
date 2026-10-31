@@ -8,15 +8,16 @@ import QueryState from "../../components/QueryState";
 import CouponFormModal from "./CouponFormModal";
 import useToast from "../../components/ui/Toast/ToastContext/useToast";
 import { discountTypeLabels } from "../../utils/enumLabels";
+import { formatPrice } from "../../utils/formatPrice.js";
 
 const SEARCHABLE_FIELDS = ["code"];
-const currencyFormatter = new Intl.NumberFormat("fa-IR");
+const numberFormatter = new Intl.NumberFormat("fa-IR");
 const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" });
 
 function formatDiscount(coupon) {
   return coupon.discountType === "PERCENTAGE"
-    ? `${currencyFormatter.format(coupon.discountValue)}٪`
-    : `${currencyFormatter.format(coupon.discountValue)} ت`;
+    ? `${numberFormatter.format(coupon.discountValue)}٪`
+    : formatPrice(coupon.discountValue);
 }
 
 // این کامپوننت باید داخل <Table> رندر شود (نه اینکه خودش <Table> را بسازد)

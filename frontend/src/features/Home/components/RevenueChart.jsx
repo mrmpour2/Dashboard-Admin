@@ -1,11 +1,12 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import Card from "../../../components/ui/Card/Card";
+import { formatPrice } from "../../../utils/formatPrice.js";
 
 const number = new Intl.NumberFormat("fa-IR");
 const day = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { month: "short", year: "2-digit", timeZone: "UTC" });
 function RevenueTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
-  return <div dir="rtl" className="rounded-lg border border-Border bg-Surface p-3 text-sm shadow-Dropdown"><p className="text-textSecondary">{label}</p><p className="mt-1 font-bold text-primary">{number.format(payload[0].value)} تومان</p></div>;
+  return <div dir="rtl" className="rounded-lg border border-Border bg-Surface p-3 text-sm shadow-Dropdown"><p className="text-textSecondary">{label}</p><p className="mt-1 font-bold text-primary">{formatPrice(payload[0].value)}</p></div>;
 }
 export default function RevenueChart({ data }) {
   const chartData = data.map((item) => ({ ...item, day: item.label || day.format(new Date(`${item.date}-01T00:00:00Z`)) }));
@@ -15,11 +16,11 @@ export default function RevenueChart({ data }) {
       <ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="var(--color-Border)" vertical={false} strokeDasharray="4 4" />
         <XAxis dataKey="day" fontSize={11} tickLine={false} axisLine={false} stroke="var(--color-textSecondary)" />
-        <YAxis width={58} fontSize={11} tickLine={false} axisLine={false} stroke="var(--color-textSecondary)" tickFormatter={(value) => number.format(value / 1000000) + "م"} />
+        <YAxis width={76} fontSize={11} tickLine={false} axisLine={false} stroke="var(--color-textSecondary)" tickFormatter={(value) => `${formatPrice(value / 1000000, "fa-IR", { currency: false, maximumFractionDigits: 1 })}م`} />
         <Tooltip content={<RevenueTooltip />} />
         <Area type="monotone" dataKey="revenue" name="فروش" stroke="var(--color-primary)" strokeWidth={2.5} fill="var(--color-primary-100)" isAnimationActive={false} />
       </AreaChart></ResponsiveContainer>
     </div>
-    <details className="mt-3 text-xs text-textSecondary"><summary className="cursor-pointer">نمایش ارقام ماهانه</summary><ul className="mt-3 grid gap-2 sm:grid-cols-2">{chartData.map((item) => <li key={item.date}>{item.day}: {number.format(item.revenue)} تومان · {number.format(item.orders ?? 0)} سفارش</li>)}</ul></details>
+    <details className="mt-3 text-xs text-textSecondary"><summary className="cursor-pointer">نمایش ارقام ماهانه</summary><ul className="mt-3 grid gap-2 sm:grid-cols-2">{chartData.map((item) => <li key={item.date}>{item.day}: {formatPrice(item.revenue)} · {number.format(item.orders ?? 0)} سفارش</li>)}</ul></details>
   </Card>;
 }

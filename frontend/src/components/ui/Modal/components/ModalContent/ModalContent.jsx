@@ -30,7 +30,7 @@ function ModalContent({ children, className = "", titleId, descriptionId, ...pro
         aria-labelledby={resolvedTitleId}
         aria-describedby={resolvedDescriptionId}
         className={clsx(
-          "relative max-h-[90dvh] w-full overflow-y-auto rounded-xl bg-Surface shadow-2xl",
+          "relative max-h-[90dvh] w-full min-w-0 overflow-x-hidden overflow-y-auto rounded-xl bg-Surface shadow-2xl",
           className,
         )}
         {...props}

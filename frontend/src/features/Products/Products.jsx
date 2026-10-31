@@ -7,6 +7,7 @@ import { Badge, Button, Card, Modal, Table } from "../../components/ui";
 import { useAuth } from "../../auth/useAuth";
 import { useDeleteProduct, useProducts } from "../../hooks/api/useProducts";
 import ProductForm from "./components/ProductForm";
+import { formatPrice } from "../../utils/formatPrice.js";
 
 const statusVariant = {
   موجود: "success",
@@ -133,7 +134,7 @@ function Products() {
         <Card className="p-4 text-right">
           <p className="text-xs text-textMuted">ارزش موجودی</p>
           <p className="mt-2 text-xl font-bold text-textPrimary">
-            {totalValue.toLocaleString("fa-IR")} تومان
+            {formatPrice(totalValue)}
           </p>
         </Card>
       </div>
@@ -181,7 +182,7 @@ function Products() {
                 </Table.Cell>
                 <Table.Cell>{product.category || "—"}</Table.Cell>
                 <Table.Cell>
-                  {Number(product.price).toLocaleString("fa-IR")} تومان
+                  {formatPrice(product.price)}
                 </Table.Cell>
                 <Table.Cell>
                   {Number(product.stock).toLocaleString("fa-IR")}

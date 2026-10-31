@@ -28,6 +28,11 @@ const ADD_ON_INCLUDE = {
   },
 };
 
+const PRODUCT_DETAILS_INCLUDE = {
+  ingredientItems: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+  customOptions: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+};
+
 /** ردیف جدول واسط → کارت محصول برای فرم پنل (`addOnIds` از `id` ساخته می‌شود). */
 function toAddOnView(link) {
   return {
@@ -67,12 +72,39 @@ function normalizeVariant(input, index) {
  * پیکربندی مخلفات را پاک نکند.
  */
 function splitPayload(data) {
-  const { variants, addOnIds, ...product } = data;
+  const { variants, addOnIds, ingredientItems, customOptions, ...product } = data;
   return {
     product,
     variants: Array.isArray(variants) ? variants.map(normalizeVariant) : null,
     addOnIds: Array.isArray(addOnIds) ? [...new Set(addOnIds.map((id) => String(id)))] : null,
+    ingredientItems: Array.isArray(ingredientItems) ? ingredientItems.map((item, index) => ({
+      name: String(item.name ?? "").trim(),
+      nameEn: String(item.nameEn ?? "").trim() || null,
+      sortOrder: Number.isInteger(item.sortOrder) ? item.sortOrder : index,
+    })) : null,
+    customOptions: Array.isArray(customOptions) ? customOptions.map((option, index) => ({
+      label: String(option.label ?? "").trim(),
+      labelEn: String(option.labelEn ?? "").trim() || null,
+      priceDelta: option.priceDelta,
+      isActive: option.isActive !== false,
+      sortOrder: Number.isInteger(option.sortOrder) ? option.sortOrder : index,
+    })) : null,
   };
+}
+
+async function replaceProductDetails(tx, productId, ingredientItems, customOptions) {
+  if (ingredientItems !== null) {
+    await tx.productIngredient.deleteMany({ where: { productId } });
+    for (const item of ingredientItems) {
+      await tx.productIngredient.create({ data: { productId, ...item } });
+    }
+  }
+  if (customOptions !== null) {
+    await tx.productOption.deleteMany({ where: { productId } });
+    for (const option of customOptions) {
+      await tx.productOption.create({ data: { productId, ...option } });
+    }
+  }
 }
 
 /**
@@ -121,7 +153,7 @@ export async function listProducts({ page, pageSize, search, category, sortBy = 
       orderBy: { [sortBy]: sortOrder },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE },
+      include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE, ...PRODUCT_DETAILS_INCLUDE },
     }),
     prisma.product.count({ where }),
   ]);
@@ -137,14 +169,14 @@ export async function listProducts({ page, pageSize, search, category, sortBy = 
 export async function getProductById(id) {
   const product = await prisma.product.findUnique({
     where: { id },
-    include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE },
+    include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE, ...PRODUCT_DETAILS_INCLUDE },
   });
   if (!product) throw new NotFoundError("محصول یافت نشد");
   return toAdminProduct(product);
 }
 
 export async function createProduct(data) {
-  const { product, variants, addOnIds } = splitPayload(data);
+  const { product, variants, addOnIds, ingredientItems, customOptions } = splitPayload(data);
   await assertAddOnsUsable(null, addOnIds);
 
   return prisma.$transaction(async (tx) => {
@@ -156,16 +188,17 @@ export async function createProduct(data) {
     });
 
     await replaceAddOns(tx, created.id, addOnIds);
+    await replaceProductDetails(tx, created.id, ingredientItems, customOptions);
 
     return toAdminProduct(await tx.product.findUnique({
       where: { id: created.id },
-      include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE },
+      include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE, ...PRODUCT_DETAILS_INCLUDE },
     }));
   });
 }
 
 export async function updateProduct(id, data) {
-  const { product, variants, addOnIds } = splitPayload(data);
+  const { product, variants, addOnIds, ingredientItems, customOptions } = splitPayload(data);
 
   const existing = await prisma.product.findUnique({ where: { id }, select: { id: true } });
   if (!existing) throw new NotFoundError("محصول یافت نشد");
@@ -191,10 +224,11 @@ export async function updateProduct(id, data) {
     }
 
     await replaceAddOns(tx, id, addOnIds);
+    await replaceProductDetails(tx, id, ingredientItems, customOptions);
 
     return toAdminProduct(await tx.product.findUnique({
       where: { id },
-      include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE },
+      include: { variants: { orderBy: VARIANT_ORDER_BY, select: VARIANT_SELECT }, ...ADD_ON_INCLUDE, ...PRODUCT_DETAILS_INCLUDE },
     }));
   });
 }

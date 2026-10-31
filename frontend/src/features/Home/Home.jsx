@@ -5,6 +5,7 @@ import StatCard from "./components/StatCard";
 import RecentActivity from "./components/RecentActivity";
 import QueryState from "../../components/QueryState";
 import { useDashboard } from "./useDashboard";
+import { formatPrice } from "../../utils/formatPrice.js";
 
 const number = new Intl.NumberFormat("fa-IR");
 const RevenueChart = lazy(() => import("./components/RevenueChart"));
@@ -39,7 +40,7 @@ export default function Home() {
               <Link to="/tickets" className="flex items-center justify-between gap-4"><span><span className="block text-sm font-semibold text-textPrimary">پاسخ به مشتری‌ها</span><span className="mt-1 block text-xs text-textSecondary">تیکت باز یا در حال بررسی</span></span><span className="text-3xl font-bold text-primary">{number.format(stats.openTickets || 0)}</span></Link>
             </div>
           </div>
-          <div className="grid grid-cols-1 divide-y divide-Border rounded-xl border border-Border bg-Surface sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">{statDefinitions.map(({ key, ...stat }) => <StatCard key={key} {...stat} value={number.format(stats[key] || 0)} />)}</div>
+          <div className="grid grid-cols-1 divide-y divide-Border rounded-xl border border-Border bg-Surface sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">{statDefinitions.map(({ key, ...stat }) => <StatCard key={key} {...stat} value={key === "revenue" ? formatPrice(stats[key] ?? 0) : number.format(stats[key] || 0)} suffix={key === "revenue" ? "" : stat.suffix} />)}</div>
           <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]"><Suspense fallback={<div className="h-80 animate-pulse rounded-xl bg-SurfaceMuted" />}><RevenueChart data={data?.monthlyRevenue || []} /></Suspense><RecentActivity orders={data?.recentOrders || []} /></div>
           <section className="grid gap-6 rounded-xl border border-Border bg-Surface p-5 sm:grid-cols-3" aria-labelledby="club-metrics-title">
             <div className="sm:col-span-3"><h2 id="club-metrics-title" className="font-bold text-textPrimary">شاخص‌های باشگاه مشتریان</h2><p className="mt-1 text-xs text-textSecondary">بر اساس اعضا و تراکنش‌های واقعی ثبت‌شده</p></div>
@@ -55,7 +56,7 @@ export default function Home() {
               <p className="text-sm text-textSecondary">فعال: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.active ?? 0)}</strong></p>
               <p className="text-sm text-textSecondary">تبدیل‌شده: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.converted ?? 0)}</strong></p>
               <p className="text-sm text-textSecondary">رهاشده: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.abandoned ?? 0)}</strong> ({number.format(Math.round((data?.abandonedCarts?.abandonmentRate ?? 0) * 100))}٪)</p>
-              <p className="text-sm text-textSecondary">ارزش ازدست‌رفته: <strong className="text-textPrimary">{number.format(data?.abandonedCarts?.lostValue ?? 0)} تومان</strong></p>
+              <p className="text-sm text-textSecondary">ارزش ازدست‌رفته: <strong className="text-textPrimary">{formatPrice(data?.abandonedCarts?.lostValue ?? 0)}</strong></p>
               <ol className="grid gap-2 sm:col-span-2 lg:col-span-4">{(data?.abandonedCarts?.topItems ?? []).map((item) => <li key={item.productId} className="flex justify-between gap-3 text-sm"><span>{item.name}</span><span>{number.format(item.quantity)}</span></li>)}</ol>
             </>}
           </section>

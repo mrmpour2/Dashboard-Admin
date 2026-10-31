@@ -22,6 +22,7 @@ import {
   useUsers,
 } from "../../hooks/api/useUsers";
 import UserForm from "./components/UserForm";
+import { formatPrice } from "../../utils/formatPrice.js";
 
 const roleLabel = { ADMIN: "مدیر کل", MANAGER: "مدیر", STAFF: "کارمند" };
 function Users() {
@@ -212,7 +213,7 @@ function Users() {
                 <Table.Cell>{roleLabel[item.role] ?? item.role}</Table.Cell>
                 <Table.Cell>{item.orders.toLocaleString("fa-IR")}</Table.Cell>
                 <Table.Cell>
-                  {item.spent.toLocaleString("fa-IR")} تومان
+                  {formatPrice(item.spent)}
                 </Table.Cell>
                 <Table.Cell>
                   <Badge

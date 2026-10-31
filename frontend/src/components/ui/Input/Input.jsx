@@ -26,8 +26,8 @@ function Input({
       .join(" ") || undefined;
 
   return (
-    <div className={clsx("flex flex-col gap-2 font-Vazir", containerClassName)}>
-      <div className="relative flex h-12 items-center rounded-Input">
+    <div className={clsx("flex w-full min-w-0 flex-col gap-2 font-Vazir", containerClassName)}>
+      <div className="relative flex h-12 w-full min-w-0 items-center rounded-Input">
         <input
           id={inputID}
           type={type}
@@ -37,7 +37,7 @@ function Input({
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy}
           className={clsx(
-            "peer w-auto min-w-20 flex-1 border-b bg-inherit py-1 transition-colors focus:border-b-2 focus:outline-none",
+            "peer w-full min-w-0 flex-1 border-b bg-inherit py-1 transition-colors focus:border-b-2 focus:outline-none",
             error
               ? "border-red-600 focus:border-red-600"
               : "border-Border focus:border-primary",
