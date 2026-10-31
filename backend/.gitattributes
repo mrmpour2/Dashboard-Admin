@@ -1,0 +1,2 @@
+# Keep line endings identical on every machine so file hashes (preflight) stay stable.
+* text=auto eol=lf
