@@ -2,11 +2,11 @@ import crypto from "node:crypto";
 import { prisma } from "../config/prisma.js";
 import { hashPassword } from "../utils/password.js";
 import { AppError, BadRequestError, NotFoundError } from "../utils/AppError.js";
-import { normalizeMobile, lockKeys, requestOtp, consumeOtp, securityAudit } from "./otpService.js";
+import { normalizeMobile, lockKeys, requestOtp, consumeOtp, securityAudit, digest } from "./otpService.js";
 
 export const claimResponse = { message: "در صورت امکان، کد تأیید به شماره موبایل ارسال می‌شود.", expiresIn: 300, resendAfter: 60 };
 
-export async function createClubClaim({ phone: rawPhone, name, pin, actorId, ip, captchaToken }) {
+export async function createClubClaim({ phone: rawPhone, name, pin, actorId, ip, captchaToken, birthDate, termsAccepted, marketingConsent = false }) {
   const phone = normalizeMobile(rawPhone);
   const normalizedPin = String(pin).replace(/[۰-۹]/g, d => String(d.charCodeAt(0)-0x6f0)).replace(/[٠-٩]/g,d => String(d.charCodeAt(0)-0x660));
   if (!/^\d{4,8}$/.test(normalizedPin) || typeof name !== "string" || name.trim().length < 2) throw new BadRequestError("اطلاعات عضویت معتبر نیست.");
@@ -18,7 +18,7 @@ export async function createClubClaim({ phone: rawPhone, name, pin, actorId, ip,
   await prisma.$transaction(async tx => {
     await lockKeys(tx, [`club:phone:${phone}`, `claim:${phone}:${actorId}`]);
     await tx.clubClaim.updateMany({ where: { phone, userId: actorId, status: "pending" }, data: { status: "rejected" } });
-    await tx.clubClaim.create({ data: { id, phone, name: name.trim(), pinHash, userId: actorId, challengeId: challenge.challengeId } });
+    await tx.clubClaim.create({ data: { id, phone, name: name.trim(), pinHash, userId: actorId, challengeId: challenge.challengeId, birthDate: birthDate ? new Date(`${birthDate}T00:00:00.000Z`) : null, termsAcceptedAt: termsAccepted ? new Date() : null, termsSource: "website_join", marketingConsent, marketingConsentAt: marketingConsent ? new Date() : null, marketingConsentSource: marketingConsent ? "website_join" : null } });
     await securityAudit(tx, "club.claim_created", phone, { claimId: id });
   });
   return { ...claimResponse, claimId: id, challengeId: challenge.challengeId };
@@ -76,13 +76,15 @@ export async function verifyClubClaim({ claimId, actorId, code, captchaToken }) 
     }
     const now = new Date();
     const existing = await tx.clubMember.findUnique({ where: { phone: claim.phone } });
-    if (existing?.verificationStatus === "verified") {
+    if (existing?.verificationStatus === "verified" && existing.isActive) {
       await tx.clubClaim.update({ where: { id: claim.id }, data: { status: "disputed" } });
       await securityAudit(tx, "club.ownership_disputed", claim.phone, { claimId: claim.id });
       return { conflict: true };
     }
-    const member = await tx.clubMember.upsert({ where: { phone: claim.phone }, create: { phone: claim.phone, name: claim.name, pinHash: claim.pinHash, verificationStatus: "verified", verifiedPhone: claim.phone, verifiedAt: now, lastLoginAt: now },
-      update: { name: claim.name, pinHash: claim.pinHash, verificationStatus: "verified", verifiedPhone: claim.phone, verifiedAt: now, lastLoginAt: now, tokenVersion: { increment: 1 } } });
+    const memberData = { name: claim.name, pinHash: claim.pinHash, verificationStatus: "verified", verifiedPhone: claim.phone, verifiedAt: now, lastLoginAt: now, birthDate: claim.birthDate, clubTermsAcceptedAt: claim.termsAcceptedAt, clubTermsSource: claim.termsSource, marketingConsent: claim.marketingConsent, marketingConsentAt: claim.marketingConsentAt, marketingConsentSource: claim.marketingConsentSource, isActive: true };
+    const member = await tx.clubMember.upsert({ where: { phone: claim.phone }, create: { phone: claim.phone, ...memberData },
+      update: { ...memberData, tokenVersion: { increment: 1 } } });
+    await tx.customerMarketingConsent.upsert({ where: { phoneHash: digest(claim.phone) }, create: { phoneHash: digest(claim.phone), marketingAllowed: claim.marketingConsent, consentAt: claim.marketingConsent ? now : null, source: claim.marketingConsentSource || "website_join" }, update: { marketingAllowed: claim.marketingConsent, consentAt: claim.marketingConsent ? now : null, source: claim.marketingConsentSource || "website_join" } });
     await tx.clubClaim.update({ where: { id: claim.id }, data: { status: "verified", verifiedPhone: claim.phone, verifiedAt: now, memberId: member.id, attemptCount: { increment: 1 } } });
     if (existing?.legacyPoints > 0 && !existing.legacyReleasedAt) {
       // Keep historical rows intact and add a traceable release adjustment.

@@ -69,3 +69,12 @@ test("Turnstile adapter validates configured secrets and fails closed without ex
     env.TURNSTILE_SECRET_KEY = "qa-synthetic-turnstile-secret";
   }
 });
+
+test("order SMS is mocked in tests and disabled without explicit production opt-in", async () => {
+  env.SMS_ENABLED = false;
+  env.SECURITY_PROVIDER_MODE = "disabled";
+  await assert.rejects(securityProviders.sendSms({ phone: "09123456789", message: "synthetic order" }), { code: "NOTIFICATION_NOT_DELIVERED" });
+  env.SECURITY_PROVIDER_MODE = "mock";
+  assert.deepEqual(await securityProviders.sendSms({ phone: "09123456789", message: "synthetic order" }), { delivered: true, mock: true });
+  env.SECURITY_PROVIDER_MODE = "disabled";
+});

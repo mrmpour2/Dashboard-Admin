@@ -61,12 +61,16 @@ function errInfo(err) {
 }
 
 async function claimNext(seenIds) {
+  const mockSmsAllowed = ["development", "test"].includes(env.NODE_ENV) && env.SECURITY_PROVIDER_MODE === "mock";
+  const smsDeliveryAllowed = env.SMS_ENABLED || mockSmsAllowed;
   const rows = await prisma.$queryRaw`
     UPDATE security_outbox
-       SET status = 'processing', locked_at = now(), attempts = attempts + 1
+       SET status = 'processing', locked_at = now(), attempts = attempts + 1,
+           last_error = NULL
      WHERE id = (
        SELECT id FROM security_outbox
         WHERE status = 'pending' AND id::text <> ALL(${seenIds}::text[])
+          AND (kind <> 'sms' OR ${smsDeliveryAllowed})
         ORDER BY attempts, created_at
         LIMIT 1
         FOR UPDATE SKIP LOCKED
@@ -85,7 +89,11 @@ async function complete(event, tx = prisma) {
 
 async function settle(event, status) {
   await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`UPDATE security_outbox SET status = ${status}, locked_at = NULL WHERE id = ${event.id}`;
+    const error = event.failureCode ?? null;
+    await tx.securityOutbox.update({
+      where: { id: event.id },
+      data: { status, lockedAt: null, lastError: error },
+    });
     await securityAudit(tx, `outbox.${event.kind}.${status}`, event.orderId);
   });
 }
@@ -135,6 +143,7 @@ function classifyFailure(event, err) {
 
 async function handleFailure(event, err) {
   const next = classifyFailure(event, err);
+  event.failureCode = typeof err?.code === "string" ? err.code.slice(0, 80) : (err?.name ?? "PROVIDER_ERROR").slice(0, 80);
   const log = next === STATUS.PENDING ? logger.warn : logger.error;
   log.call(
     logger,
@@ -237,11 +246,20 @@ async function runTicket(event) {
 }
 
 async function runNotify(event) {
-  const result = await securityProviders.notify({
-    ...event.payload,
-    idempotencyKey: event.key,
-    orderId: event.orderId,
-  });
+  if (event.kind === "sms" && event.payload?.category === "marketing") {
+    const member = event.payload.memberId ? await prisma.clubMember.findUnique({ where: { id: event.payload.memberId }, select: { isActive: true, marketingConsent: true } }) : null;
+    const allowed = Boolean(member?.isActive && member.marketingConsent);
+    if (!allowed) {
+      await prisma.$transaction(async tx => {
+        await tx.securityOutbox.update({ where: { id: event.id }, data: { status: STATUS.COMPLETED, completedAt: new Date(), lockedAt: null } });
+        await securityAudit(tx, "club.marketing_sms.skipped_revoked", event.orderId);
+      });
+      return;
+    }
+  }
+  const result = event.kind === "sms"
+    ? await securityProviders.sendSms({ ...event.payload, idempotencyKey: event.key, orderId: event.orderId })
+    : await securityProviders.notify({ ...event.payload, idempotencyKey: event.key, orderId: event.orderId });
   if (result?.delivered === false) throw new NotificationNotDeliveredError();
   await complete(event);
 }
