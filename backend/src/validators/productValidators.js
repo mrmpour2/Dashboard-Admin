@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeProductVideoUrl } from "../utils/productVideo.js";
 
 export const listProductsSchema = z.object({
   body: z.object({}).optional(),
@@ -49,9 +50,27 @@ const addOnIdsSchema = z
   .max(12, "حداکثر ۱۲ مخلفات برای هر محصول")
   .refine((ids) => new Set(ids).size === ids.length, { message: "مخلفات تکراری مجاز نیست" });
 
-const optionalHttpUrlSchema = z.string().url().refine((value) => {
-  return value.startsWith("http://") || value.startsWith("https://");
-}, "آدرس باید با http یا https شروع شود").or(z.literal(""));
+const optionalHttpUrlSchema = z.string().trim().max(2000).optional()
+  .superRefine((value, context) => {
+    if (value && normalizeProductVideoUrl(value) === null) {
+      context.addIssue({ code: "custom", message: "فقط فایل مستقیم MP4/WebM/OGG یا لینک معتبر آپارات/یوتیوب پذیرفته می‌شود." });
+    }
+  })
+  .transform((value) => value ? normalizeProductVideoUrl(value) : value);
+
+const ingredientItemsSchema = z.array(z.object({
+  name: z.string().trim().min(1).max(120),
+  nameEn: z.string().trim().max(120).optional().or(z.literal("")),
+  sortOrder: z.coerce.number().int().min(0).max(999).optional(),
+})).max(30);
+
+const customOptionsSchema = z.array(z.object({
+  label: z.string().trim().min(1).max(120),
+  labelEn: z.string().trim().max(120).optional().or(z.literal("")),
+  priceDelta: z.coerce.number().finite().min(0).max(1000000000),
+  isActive: z.coerce.boolean().optional(),
+  sortOrder: z.coerce.number().int().min(0).max(999).optional(),
+})).max(12);
 
 export const createProductSchema = z.object({
   query: z.object({}).optional(),
@@ -66,7 +85,10 @@ export const createProductSchema = z.object({
     stock: z.coerce.number().int().min(0).default(0),
     category: z.string().trim().max(100).optional(),
     imageUrl: z.string().url().optional().or(z.literal("")),
-    videoUrl: optionalHttpUrlSchema.optional(),
+    videoUrl: optionalHttpUrlSchema,
+    editorialScore: z.union([z.coerce.number().int().min(1).max(10), z.null()]).optional(),
+    ingredientItems: ingredientItemsSchema.optional(),
+    customOptions: customOptionsSchema.optional(),
     // سایزهای قابل انتخاب؛ خالی یا نبودن یعنی محصول تک‌قیمت است.
     variants: variantsSchema.optional(),
     // مخلفات پیشنهادی این محصول؛ خالی یعنی هیچ پیشنهادی ندارد.

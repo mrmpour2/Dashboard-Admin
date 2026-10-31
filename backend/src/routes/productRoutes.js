@@ -8,6 +8,7 @@ import {
   updateProductSchema,
 } from "../validators/productValidators.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
+import { handleUpload } from "../middleware/upload.js";
 
 const router = Router();
 
@@ -27,6 +28,13 @@ router.patch(
   requireRole("ADMIN", "MANAGER"),
   validate(updateProductSchema),
   productController.updateProduct,
+);
+router.post(
+  "/:id/image",
+  requireRole("ADMIN", "MANAGER"),
+  validate(productIdParamSchema),
+  handleUpload,
+  productController.uploadProductImage,
 );
 router.delete(
   "/:id",
