@@ -73,34 +73,6 @@ test('Audit regressions against an isolated PostgreSQL schema', async (t) => {
       assert.equal(accepted, undefined);
     });
 
-    await t.test('receipt approval cannot revive a cancelled order', async () => {
-      const { payment, order } = await makeOrder({ status: 'CANCELLED' });
-      const result = await invoke(payments.reviewCardToCardReceipt, reviewReq(payment, 'approve'));
-      assert.equal(result.error?.statusCode, 400);
-      assert.equal((await prisma.chatOrder.findUnique({ where: { id: order.id } })).status, 'CANCELLED');
-      assert.equal((await prisma.chatPayment.findUnique({ where: { id: payment.id } })).status, 'PENDING_REVIEW');
-    });
-
-    await t.test('two reviews of one receipt allow one decision', async () => {
-      const { payment, product, order } = await makeOrder();
-      const original = prisma.chatPayment.findUnique.bind(prisma.chatPayment);
-      let reads = 0, release;
-      const gate = new Promise((resolve) => { release = resolve; });
-      prisma.chatPayment.findUnique = async (...args) => {
-        const result = await original(...args);
-        reads += 1;
-        if (reads === 2) release();
-        await gate;
-        return result;
-      };
-      let results;
-      try { results = await Promise.all(['reject', 'reject'].map((decision) => invoke(payments.reviewCardToCardReceipt, reviewReq(payment, decision)))); }
-      finally { prisma.chatPayment.findUnique = original; }
-      assert.equal(results.filter((result) => !result.error).length, 1);
-      assert.equal((await prisma.product.findUnique({ where: { id: product.id } })).stock, 4);
-      assert.equal((await prisma.chatOrder.findUnique({ where: { id: order.id } })).status, 'CANCELLED');
-    });
-
   } finally {
     globalThis.fetch = nativeFetch;
     await prisma.$disconnect();

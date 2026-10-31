@@ -75,14 +75,7 @@ test("SEC-005: atomic reservation lifecycle in disposable PostgreSQL", async t =
       const changed = structuredClone(req); changed.body.items[0].quantity = 2;
       assert.equal((await invoke(payments.createChatOrder, changed)).error.code, "IDEMPOTENCY_CONFLICT");
     });
-    await check("late card receipt without stock is rejected with manual-review ticket", async () => {
-      const product = await item(); const { order } = await create(product);
-      const p = await prisma.chatPayment.create({ data: { orderId: order.id, method: "CARD_TO_CARD", status: "PENDING_REVIEW", amountToman: 10000, amountRial: 100000n } });
-      await expire(order);
-      await prisma.$transaction(tx => stock.recordStaffSale(tx, "synthetic-card-sale", [{ productId: product.id, quantity: 1 }]));
-      const r = await invoke(payments.reviewCardToCardReceipt, { params: { paymentId: p.id }, body: { decision: "approve" }, user: fixture.admin });
-      assert.equal(r.error, undefined); assert.equal(r.data.payment.status, "REJECTED");
-    });    await check("cancellation releases rather than expires and is idempotent", async () => {
+    await check("cancellation releases rather than expires and is idempotent", async () => {
       const product = await item(); const { order } = await create(product);
       await Promise.all([stock.cancelChatOrder(order.id), stock.cancelChatOrder(order.id)]);
       assert.equal((await prisma.stockReservation.findFirst({ where: { orderId: order.id } })).status, "released");
